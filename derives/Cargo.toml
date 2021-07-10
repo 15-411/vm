@@ -1,0 +1,13 @@
+[package]
+name = "derives"
+version = "0.2.0"
+authors = ["Srinivas Lade <slade@andrew.cmu.edu>"]
+edition = "2018"
+publish = false
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = "1.0"
+quote = "1.0"

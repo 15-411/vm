@@ -1,0 +1,11 @@
+[package]
+name = "vm"
+version = "0.1.0"
+authors = ["Srinivas Lade <srinulade1@gmail.com>"]
+edition = "2018"
+publish = false
+
+[dependencies]
+logos = "0.12.0"
+
+derives = { path = "../derives" }
