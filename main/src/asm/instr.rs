@@ -1,5 +1,7 @@
 use std::fmt::{Display, Error, Formatter};
+
 use derives::DebugFromDisplay;
+use itertools::Itertools;
 
 use crate::ops::{BinOp, UnOp};
 
@@ -73,7 +75,8 @@ impl Display for Instr {
       Self::Mov { dest, src } => write!(f, "{} = {}", dest, src),
       Self::Call { dest: Some(dest), src, name } =>
         write!(f, "{} = {}({:?})", dest, name, src),
-      Self::Call { dest: None, src, name } => write!(f, "{}({:?})", name, src),
+      Self::Call { dest: None, src, name } =>
+        write!(f, "{}({})", name, src.iter().format(", ")),
     }
   }
 }

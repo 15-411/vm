@@ -1,5 +1,7 @@
 use std::fmt::{Display, Error, Formatter};
+
 use derives::DebugFromDisplay;
+use itertools::Itertools;
 
 use crate::ops::BinOp;
 use super::instr::{Operand, Instr, Temp};
@@ -62,7 +64,7 @@ pub struct BasicBlock {
 
 impl Display for BasicBlock {
   fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-    writeln!(f, "  {}({:?}):", self.id, self.preds)?;
+    writeln!(f, "  {}({}):", self.id, self.preds.iter().format(", "))?;
 
     for (dest, ops) in self.phis.iter() {
       writeln!(f, "  {} = PHI({:?})", dest, ops)?;
@@ -85,7 +87,7 @@ pub struct Func {
 
 impl Display for Func {
   fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-    writeln!(f, "{}({:?}):", self.name, self.params)?;
+    writeln!(f, "{}({}):", self.name, self.params.iter().format(", "))?;
 
     for block in self.blocks.iter() {
       writeln!(f, "{}", block)?;
