@@ -9,7 +9,7 @@ use crate::ops::{BinOp, UnOp};
 // TODO: Consider extending to have named temporaries
 // Instead of t0, t1, could have t_retval or something similar
 // If allowed, maybe should use a different prefix (LLVM uses %)
-#[derive(DebugFromDisplay, Clone)]
+#[derive(DebugFromDisplay, Clone, Hash, PartialEq, Eq)]
 pub struct Temp(pub u64);
 
 impl Display for Temp {

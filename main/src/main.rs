@@ -1,5 +1,6 @@
-mod ops;
 mod asm;
+mod exec;
+mod ops;
 
 
 fn main() {
