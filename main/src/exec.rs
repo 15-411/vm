@@ -49,7 +49,7 @@ pub enum ReturnType {
   Timeout,
 }
 
-struct ProgContext {
+pub struct ProgContext {
   prog: ASM,
 }
 
@@ -144,9 +144,8 @@ impl ProgContext {
     }
   }
 
-  fn run(prog: ASM) {
+  pub fn run(prog: ASM) -> ReturnType {
     let ctx = ProgContext { prog };
-
-    ctx.run_func("main".to_string(), vec![]);
+    ctx.run_func("main".to_string(), vec![])
   }  
 }

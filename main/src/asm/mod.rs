@@ -2,9 +2,9 @@ pub mod instr;
 pub mod blocks;
 
 
-use std::collections::HashMap;
+use fxhash::FxHashMap;
 
 use blocks::Func;
 
 
-pub type ASM = HashMap<String, Func>;
+pub type ASM = FxHashMap<String, Func>;
