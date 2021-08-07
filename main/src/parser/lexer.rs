@@ -1,4 +1,6 @@
-use logos::Logos;
+use std::str::FromStr;
+
+use logos::{Logos, Lexer};
 
 
 // TODO: Consider dynamic extensibility of lexer
@@ -46,15 +48,14 @@ pub enum Token {
   #[token("!")]    LogNot,
 
   // Identifiers
-  #[regex(r"t(0|[1-9][0-9]*)", |lex| lex.slice().parse())] 
+  #[regex(r"t(0|[1-9][0-9]*)", temp)] 
   Temp(u64),
 
-  #[regex(r"B(0|[1-9][0-9]*)", |lex| lex.slice().parse())] 
+  #[regex(r"B(0|[1-9][0-9]*)", block)] 
   Block(u64),
 
-  // TODO: Support Negative Numbers as well
-  #[regex(r"0|[1-9][0-9]*", |lex| lex.slice().parse())] 
-  Const(u64),
+  #[regex(r"(-?)(0|[1-9][0-9]*)", parse_dec)] 
+  Const(i32),
 
   #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().parse())] 
   Id(String),
@@ -63,4 +64,30 @@ pub enum Token {
   #[regex(r"[ \t\f]+", logos::skip)]
   #[error]
   Error,
+}
+
+/// Parse Numeral Number Strings to i32 Integers
+/// Must specially handle INT_MIN because the minus sign is ignored
+fn parse_dec(lex: &mut Lexer<Token>) -> i32 {
+  const INT_MIN: i64 = -2_147_483_648;
+  const INT_MAX: i64 = 2_147_483_648;
+
+  let res = match i64::from_str(lex.slice()) {
+    Ok(val) if val >= INT_MIN && val <= INT_MAX => Some(val as i32),
+    _ => None,
+  };
+
+  res.unwrap()
+}
+
+fn temp(lex: &mut Lexer<Token>) -> Option<u64> {
+  let slice = lex.slice();
+  let n: u64 = slice[1..].parse().ok()?; // skip 't'
+  Some(n)
+}
+
+fn block(lex: &mut Lexer<Token>) -> Option<u64> {
+  let slice = lex.slice();
+  let n: u64 = slice[1..].parse().ok()?; // skip 'b'
+  Some(n)
 }

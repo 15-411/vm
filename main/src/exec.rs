@@ -42,11 +42,11 @@ impl TempStore {
 
 #[derive(Eq, PartialEq, Debug)]
 pub enum ReturnType {
-  Return(u64),
+  Return(i32),
   DivByZero,
-  Abort,
-  MemError,
-  Timeout,
+  // Abort,
+  // MemError,
+  // Timeout,
 }
 
 pub struct ProgContext {
@@ -109,7 +109,7 @@ impl ProgContext {
           Instr::Call  { name, dest, src } => {
             match self.run_func(name.clone(), src.iter().map(|x| store.get_op64(x)).collect()) {
               ReturnType::Return(val) => if let Some(dest) = dest {
-                store.save(dest, val);
+                store.save(dest,  val as u64);
               },
               other => return other,
             }
@@ -120,7 +120,7 @@ impl ProgContext {
       // Path Handling
       match branch {
         Branch::Ret(None) => return ReturnType::Return(0),  // Doesnt Matter if No Dest
-        Branch::Ret(Some(ret)) => return ReturnType::Return(store.get_op64(ret)),
+        Branch::Ret(Some(ret)) => return ReturnType::Return(store.get_op64(ret) as i32),
         Branch::Jump(bidx) => { 
           prev_block = Some(curr_block);
           curr_block = *bidx;

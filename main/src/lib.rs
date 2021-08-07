@@ -1,17 +1,18 @@
-mod args;
+pub mod args;
 mod asm;
 mod exec;
 mod ops;
 mod parser;
 
+
 use std::fs::File;
 use std::io::{BufReader, Read};
 
-use exec::{ProgContext, ReturnType};
+use exec::ProgContext;
+pub use exec::ReturnType;
 
 
-fn main() {
-  let (file_name, _) = args::parse_args();
+pub fn run(file_name: String) -> Option<ReturnType> {
   let mut file = BufReader::new(
     File::open(&file_name).unwrap_or_else(|_| panic!("File {} not found", file_name))
   );
@@ -27,13 +28,9 @@ fn main() {
     Ok(res) => res,
     Err(e) => {
       eprintln!("Parse Error: {}", e);
-      return; // Parse failed!
+      return None; // Parse failed!
     }
   };
 
-  match ProgContext::run(abs_asm) {
-    ReturnType::Return(val) => println!("{}", val),
-    ReturnType::DivByZero => println!("div-by-zero"),
-    _ => unreachable!()
-  }
+  Some(ProgContext::run(abs_asm))
 }

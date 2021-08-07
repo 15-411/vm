@@ -1,2 +1,3 @@
 [workspace]
-members = ["derives", "main"]
+members = ["derives", "main", "runner"]
+default-run = "runner"

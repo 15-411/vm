@@ -1,0 +1,13 @@
+[package]
+name = "runner"
+version = "0.1.0"
+authors = ["Srinivas Lade <srinulade1@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+structopt = "0.3.21"
+rayon = "1.5.0"
+itertools = "0.9.0"
+prettytable-rs = "0.8.0"
+
+vm = { path = "../main" }

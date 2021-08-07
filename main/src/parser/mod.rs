@@ -44,11 +44,16 @@ impl<'a> Parser<'a> {
   }
 
   fn skip_newlines(&mut self) -> Result<()> {
-    while self.peek()? == Token::NewLine {
-      self.skip()?;
-    }
+    self.munch(Token::NewLine)?;
+    self.skip_opt_newlines();
 
     Ok(())
+  }
+
+  fn skip_opt_newlines(&mut self) {
+    while matches!(self.peek(), Ok(Token::NewLine)) {
+      self.skip().expect("Should Always Work");
+    }
   }
 
   // Skips to the next token, verifying that this has the value we expect.
@@ -67,7 +72,7 @@ impl<'a> Parser<'a> {
     if let Token::Temp(val) = tok {
       Ok(Temp(val))
     } else {
-      errs(format!("Expected temp, go {:?}", tok))
+      errs(format!("Expected temp, got {:?}", tok))
     }
   }
 
@@ -122,6 +127,8 @@ impl<'a> Parser<'a> {
           tok => {
             let op = binop_code(tok)?;
             let src2 = self.operand()?;
+
+            self.munch(Token::NewLine)?;
             Ok(Instr::BinOp { dest, op, src1: lsrc, src2 })
           }
         }
@@ -141,7 +148,10 @@ impl<'a> Parser<'a> {
     loop {
       match self.peek()? {
         Token::Ret | Token::Jmp | Token::If => break,
-        _ => lines.push(self.instr()?)
+        _ => {
+          lines.push(self.instr()?);
+          self.skip_opt_newlines();
+        }
       } 
     }
 
@@ -187,7 +197,8 @@ impl<'a> Parser<'a> {
   
   fn func(&mut self) -> Result<Func> {
     let name = self.name()?;
-    
+    self.munch(Token::LParen)?;
+
     // Parse List of Parameters
     let params = if self.peek()? == Token::RParen {
       self.skip()?;
@@ -208,8 +219,10 @@ impl<'a> Parser<'a> {
       params
     };
 
+    self.skip_newlines()?;
+
     // Parser Blocks (or single block)
-    let blocks = if matches!(self.peek()?, Token::Temp(_)) { 
+    let blocks = if matches!(self.peek()?, Token::Temp(_) | Token::Ret) { 
       let (lines, branch) = self.block_inner()?;
       vec![BasicBlock { id: BlockID(0), preds: vec![], phis: vec![], lines, branch }]      
     } else {
@@ -221,11 +234,12 @@ impl<'a> Parser<'a> {
 
   fn asm(&mut self) -> Result<ASM> {  
     let mut funcs = FxHashMap::default();
+    self.skip_opt_newlines();
 
     while self.peek() != Err(Error::EOF) {
-      self.skip_newlines()?;
       let func = self.func()?;
       funcs.insert(func.name.clone(), func);
+      self.skip_newlines()?;
     }
 
     Ok(funcs)
@@ -235,7 +249,6 @@ impl<'a> Parser<'a> {
 // Parses the file string into an ASM
 pub fn parse(file_str: String) -> Result<ASM> {
   let lexer = Token::lexer(file_str.as_str()).peekable();
-
   let mut parser = Parser { lexer };
   parser.asm()
 }
