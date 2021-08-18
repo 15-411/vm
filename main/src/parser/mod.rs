@@ -105,32 +105,51 @@ impl<'a> Parser<'a> {
     }
   }
 
+  fn mov_binop_instr(&mut self, dest: Temp, lsrc: Operand) -> Result<Instr> {
+    match self.token()? {
+      Token::NewLine => Ok(Instr::Mov { dest, src: lsrc }),
+      tok => {
+        let op = binop_code(tok)?;
+        let src2 = self.operand()?;
+
+        self.munch(Token::NewLine)?;
+        Ok(Instr::BinOp { dest, op, src1: lsrc, src2 })
+      }
+    }
+  }
+
   fn instr(&mut self) -> Result<Instr> {
     match self.token()? {
       Token::Temp(val) => {
         let dest = Temp(val);
         self.munch(Token::Assign)?;
 
-        let lsrc = match self.token()? {
+        match self.token()? {
           op @ (Token::Sub | Token::LogNot | Token::BitNot) => {
             let src = self.operand()?;
-            return Ok(Instr::UnOp { dest, src, op: unop_code(op)? })
+            self.munch(Token::NewLine)?;
+            Ok(Instr::UnOp { dest, src, op: unop_code(op)? })
           },
 
-          Token::Temp(val) => Operand::Temp(Temp(val)),
-          Token::Const(val) => Operand::Const(val as i32),
-          _ => unreachable!(),
-        };
+          Token::Phi => {
+            let mut srcs = vec![];
+            loop {
+              match self.token()? {
+                Token::Temp(val) => { srcs.push(Operand::Temp(Temp(val))); },
+                Token::Const(val) => { srcs.push(Operand::Const(val)); },
+                Token::NewLine => break,
+                _ => unreachable!(),
+              }
+            }
 
-        match self.token()? {
-          Token::NewLine => Ok(Instr::Mov { dest, src: lsrc }),
-          tok => {
-            let op = binop_code(tok)?;
-            let src2 = self.operand()?;
-
-            self.munch(Token::NewLine)?;
-            Ok(Instr::BinOp { dest, op, src1: lsrc, src2 })
+            Ok(Instr::Phi { dest, srcs })
           }
+
+          Token::Temp(val) =>
+            self.mov_binop_instr(dest, Operand::Temp(Temp(val))),
+          Token::Const(val) =>
+            self.mov_binop_instr(dest, Operand::Const(val)),
+          _ => unreachable!(),
         }
       },
 
@@ -188,11 +207,51 @@ impl<'a> Parser<'a> {
       _ => unreachable!(),
     };
 
+    self.skip_newlines()?;
     Ok((lines, branch))
   }
 
   fn blocks(&mut self) -> Result<Vec<BasicBlock>> {
-    todo!()
+    let mut blocks = vec![];
+
+    loop {
+      match self.peek() {
+        Ok(Token::Id(_)) | Err(Error::EOF) => {
+          return if blocks.is_empty() { err("Function Needs At Least 1 Block") } else { Ok(blocks) }
+        },
+
+        Ok(Token::Block(_)) => {
+          let id = self.block()?;
+          // println!("Block {:?}", self.lexer.clone().into_iter().collect::<Vec<_>>());
+          // Parse List of Predecessors
+          let preds = if self.peek()? == Token::Colon {
+            self.munch(Token::Colon)?;
+
+            let mut preds = vec![];
+            loop {
+              match self.token()? {
+                Token::Block(val) => preds.push(BlockID(val)),
+                Token::NewLine => break,
+                _ => return err("Invalid Block Predecessor List"),
+              }
+            }
+
+            preds
+            
+          } else {
+            self.munch(Token::NewLine)?;
+            vec![]
+          };
+
+          self.skip_opt_newlines();
+          // println!("After Preds {:?}", self.lexer.clone().into_iter().collect::<Vec<_>>());
+          let (lines, branch) = self.block_inner()?;
+          blocks.push(BasicBlock { id, preds, lines, branch })
+        },
+
+        _ => return err("Invalid Block Header"),
+      }
+    }
   }
   
   fn func(&mut self) -> Result<Func> {
@@ -224,7 +283,7 @@ impl<'a> Parser<'a> {
     // Parser Blocks (or single block)
     let blocks = if matches!(self.peek()?, Token::Temp(_) | Token::Ret) { 
       let (lines, branch) = self.block_inner()?;
-      vec![BasicBlock { id: BlockID(0), preds: vec![], phis: vec![], lines, branch }]      
+      vec![BasicBlock { id: BlockID(0), preds: vec![], lines, branch }]      
     } else {
       self.blocks()?
     };
@@ -239,7 +298,7 @@ impl<'a> Parser<'a> {
     while self.peek() != Err(Error::EOF) {
       let func = self.func()?;
       funcs.insert(func.name.clone(), func);
-      self.skip_newlines()?;
+      // self.skip_newlines();
     }
 
     Ok(funcs)
@@ -249,6 +308,7 @@ impl<'a> Parser<'a> {
 // Parses the file string into an ASM
 pub fn parse(file_str: String) -> Result<ASM> {
   let lexer = Token::lexer(file_str.as_str()).peekable();
+  // println!("{:?}", lexer.clone().into_iter().collect::<Vec<_>>());
   let mut parser = Parser { lexer };
   parser.asm()
 }

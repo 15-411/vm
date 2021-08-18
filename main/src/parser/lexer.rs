@@ -14,6 +14,7 @@ pub enum Token {
   #[token("jmp")]  Jmp,
   #[token("if")]   If,
   #[token("call")] Call,
+  #[token("phi")]  Phi,
 
   #[token("(")]    LParen,
   #[token(")")]    RParen,
@@ -47,21 +48,24 @@ pub enum Token {
   #[token("||")]   LogOr,
   #[token("!")]    LogNot,
 
+  #[token("\n")]   NewLine,
+
   // Identifiers
-  #[regex(r"t(0|[1-9][0-9]*)", temp)] 
+  #[regex(r"\#(0|[1-9][0-9]*)", parse_udec)] 
   Temp(u64),
 
-  #[regex(r"B(0|[1-9][0-9]*)", block)] 
+  #[regex(r"@(0|[1-9][0-9]*)", parse_udec)] 
   Block(u64),
 
-  #[regex(r"(-?)(0|[1-9][0-9]*)", parse_dec)] 
+  #[regex(r"(-?)(0|[1-9][0-9]*)", parse_dec)]
+  #[regex(r"0[xX][0-9a-fA-F]+", parse_hex)]
   Const(i32),
 
   #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().parse())] 
   Id(String),
 
-  #[token("\n")] NewLine,
-  #[regex(r"[ \t\f]+", logos::skip)]
+  #[regex(r"[ \t\f\v\r]+", logos::skip)]
+  #[regex(r"//[^\n]*", logos::skip)]
   #[error]
   Error,
 }
@@ -80,14 +84,33 @@ fn parse_dec(lex: &mut Lexer<Token>) -> i32 {
   res.unwrap()
 }
 
-fn temp(lex: &mut Lexer<Token>) -> Option<u64> {
-  let slice = lex.slice();
-  let n: u64 = slice[1..].parse().ok()?; // skip 't'
-  Some(n)
+fn parse_hex(lex: &mut logos::Lexer<Token>) -> Option<i32> {
+  // println!("LEX {:?}", lex.slice());
+
+  fn preceding_zeros(string: &str) -> usize {
+    for (i, chr) in string.char_indices() {
+      if chr != '0' {
+        return i;
+      }
+    }
+
+    string.len()
+  }
+
+  let buffer = &lex.slice()[2..];
+  if buffer.len() - preceding_zeros(buffer) > 8 {
+    None
+  } else {
+    match i64::from_str_radix(&lex.slice()[2..], 16) {
+      Ok(val) => Some(val as i32),
+      Err(_) => None,
+    }
+  }
 }
 
-fn block(lex: &mut Lexer<Token>) -> Option<u64> {
+
+fn parse_udec(lex: &mut Lexer<Token>) -> Option<u64> {
   let slice = lex.slice();
-  let n: u64 = slice[1..].parse().ok()?; // skip 'b'
+  let n: u64 = slice[1..].parse().ok()?; // skip '#' or '@'
   Some(n)
 }

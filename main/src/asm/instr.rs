@@ -58,6 +58,11 @@ pub enum Instr {
     src: Operand,
   },
   
+  Phi {
+    dest: Temp,
+    srcs: Vec<Operand>,
+  },
+
   // Not all function calls return a value
   Call {
     name: String,
@@ -73,6 +78,7 @@ impl Display for Instr {
         write!(f, "{} = {} {} {}", dest, src1, op, src2),
       Self::UnOp { dest, op, src } => write!(f, "{} = {}{}", dest, op, src),
       Self::Mov { dest, src } => write!(f, "{} = {}", dest, src),
+      Self::Phi { dest, srcs } => write!(f, "{} = phi{}", dest, srcs.iter().format(" ")),
       Self::Call { dest: Some(dest), src, name } =>
         write!(f, "{} = {}({:?})", dest, name, src),
       Self::Call { dest: None, src, name } =>

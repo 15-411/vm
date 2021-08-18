@@ -67,22 +67,8 @@ impl ProgContext {
 
     // Run Function Blocks
     loop {
-      let BasicBlock { preds, phis, lines, branch, .. } 
+      let BasicBlock { preds, lines, branch, .. } 
         = blocks.get(curr_block.0 as usize).unwrap();
-
-      // Evaluate Phi Functions
-      if !phis.is_empty() {
-        if let Some(prev) = prev_block {
-          let pred_idx = preds.iter().position(|&x| x == prev).unwrap();
-          for (dest, ops) in phis {
-            let op = ops.get(pred_idx).unwrap();
-            store.save(dest, store.get_op64(op));
-          }
-
-        } else {
-          panic!("First Block Executed has Phi Functions"); // TODO: Better Method for Canceling
-        }
-      }
 
       // Evaluate Operations
       for line in lines {
@@ -104,6 +90,17 @@ impl ProgContext {
           Instr::Mov   { dest, src } => {
             let src_val = store.get_op64(src);
             store.save(dest, src_val);
+          },
+
+          Instr::Phi   { dest, srcs } => {
+            if let Some(prev) = prev_block {
+              let pred_idx = preds.iter().position(|&x| x == prev).unwrap();
+              let src = srcs.get(pred_idx).unwrap();
+              store.save(dest, store.get_op64(src));
+    
+            } else {
+              panic!("First Block Executed has Phi Functions"); // TODO: Better Method for Canceling
+            }
           },
 
           Instr::Call  { name, dest, src } => {

@@ -57,7 +57,6 @@ impl Display for Branch {
 pub struct BasicBlock {
   pub id: BlockID,
   pub preds: Vec<BlockID>,
-  pub phis: Vec<(Temp, Vec<Operand>)>,
   pub lines: Vec<Instr>,
   pub branch: Branch,
 }
@@ -65,10 +64,6 @@ pub struct BasicBlock {
 impl Display for BasicBlock {
   fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
     writeln!(f, "  {}({}):", self.id, self.preds.iter().format(", "))?;
-
-    for (dest, ops) in self.phis.iter() {
-      writeln!(f, "  {} = PHI({:?})", dest, ops)?;
-    }
 
     for instr in self.lines.iter() {
       writeln!(f, "  {}", instr)?;

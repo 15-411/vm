@@ -6,7 +6,7 @@ This repo contains the source for the Abstract Assembly Virtual Machine that can
 ## Assembly Structure
 TODO: The design of the abstract assembly language is a work-in-progress. Please let me know if you have any thoughts about the structure, notation or anything you think that can be improved upon.
 
-Except for newlines, the language is whitespace-insensitive. This might be hard to parse, so in the future I might use indentation to indicate blocks like Python. At the top 
+The syntax in BNF form can be found in the `format.txt` file.
 
 
 ### Identifiers
