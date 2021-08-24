@@ -1,8 +1,9 @@
-use vm::{self, args, ReturnType};
+use structopt::StructOpt;
+use vm::{self, args::Config, ReturnType};
 
 fn main() {
-  let (file_name, _) = vm::args::parse_args();
-  match vm::run(file_name) {
+  let config = Config::from_args();
+  match vm::run(config.file_name.as_path()) {
     None => eprintln!("Parse Error"),
     Some(ReturnType::Return(val)) => println!("{}", val),
     Some(ReturnType::DivByZero) => println!("div-by-zero"),

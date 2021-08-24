@@ -6,6 +6,7 @@ edition = "2018"
 publish = false
 
 [dependencies]
+structopt = "0.3.21"
 fxhash = "0.2.1"
 itertools = "0.10.1"
 logos = "0.12.0"

@@ -2,14 +2,13 @@
 mod util;
 
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 use std::ffi::{OsStr, OsString};
 use std::fs::File;
 use std::io::BufReader;
 use std::io::prelude::*;
 use std::process::Command;
-use std::str;
 
 use structopt::StructOpt;
 use rayon::prelude::*;
@@ -130,6 +129,7 @@ fn main() {
     .filter_map(|(path, expec)| {
       // let (just_tc, header) = util::expected_header(&path);
       // let maybe_ast = compiler::run_front(&cfg);
+      let ext = path.extension().unwrap().to_os_string();
       let mut compiler = Command::new("tests/lab1");
       compiler.arg(path.clone());
 
@@ -146,7 +146,10 @@ fn main() {
             .status.success();
 
           if success {
-            run_vm(format!("{}.abs", path.display()))
+            let mut abs_ext = ext.clone();
+            abs_ext.push(".abs");
+
+            run_vm(path.with_extension(abs_ext).as_path())
             .map_or(false, |ret| ret == ReturnType::Return(val))
 
           } else {
@@ -160,7 +163,10 @@ fn main() {
             .status.success();
 
           if success {
-            run_vm(format!("{}.abs", path.display()))
+            let mut abs_ext = ext.clone();
+            abs_ext.push(".abs");
+
+            run_vm(path.with_extension(abs_ext).as_path())
             .map_or(false, |ret| ret == ReturnType::DivByZero)
 
           } else {
