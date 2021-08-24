@@ -2,6 +2,8 @@ use std::str::FromStr;
 
 use logos::{Logos, Lexer};
 
+use crate::asm::{instr::TempID, reg::Register};
+
 
 // TODO: Consider dynamic extensibility of lexer
 // If we want to allow custom instructions, then we need to find some way
@@ -51,8 +53,8 @@ pub enum Token {
   #[token("\n")]   NewLine,
 
   // Identifiers
-  #[regex(r"\#(0|[1-9][0-9]*)", parse_udec)] 
-  Temp(u64),
+  #[regex(r"\#(0|[1-9][0-9]*)", parse_temp)] 
+  Temp(TempID),
 
   #[regex(r"@(0|[1-9][0-9]*)", parse_udec)] 
   Block(u64),
@@ -69,6 +71,17 @@ pub enum Token {
   #[error]
   Error,
 }
+
+/// Parse Temporaries into TempID Constituent
+/// Including Numbered Temps and Register Temps
+fn parse_temp(lex: &mut Lexer<Token>) -> Option<TempID> {
+  let token = &lex.slice()[1..];
+
+  Register::from_str(token).ok()
+    .map(|x| TempID::Reg(x))
+    .or_else(|| token.parse().ok().map(|x| TempID::Num(x)))
+}
+
 
 /// Parse Numeral Number Strings to i32 Integers
 /// Must specially handle INT_MIN because the minus sign is ignored

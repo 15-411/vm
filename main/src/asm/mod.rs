@@ -1,5 +1,6 @@
 pub mod instr;
 pub mod blocks;
+pub mod reg;
 
 
 use fxhash::FxHashMap;

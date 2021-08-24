@@ -3,7 +3,8 @@ use itertools::Itertools;
 
 use crate::asm::ASM;
 use crate::asm::blocks::{Func, BlockID, BasicBlock, Branch, Cond};
-use crate::asm::instr::{Temp, Operand, Instr};
+use crate::asm::instr::{Temp, Operand, Instr, TempID};
+use crate::asm::reg::Register;
 
 
 struct TempStore {
@@ -11,8 +12,13 @@ struct TempStore {
 }
 
 impl TempStore {
-  fn get(&self, temp: &Temp) -> u64 {
-    *self.temps.get(temp).unwrap()
+  fn new() -> Self {
+    let mut temps = FxHashMap::default();
+    for reg in Register::ALL {
+      temps.insert(Temp(TempID::Reg(reg)), 0);
+    }
+
+    TempStore { temps }    
   }
 
   fn get_op64(&self, op: &Operand) -> u64 {
@@ -35,7 +41,17 @@ impl TempStore {
 
   fn save(&mut self, dest: &Temp, src: u64) {
     // TODO: Can switch between SSA and non-SSA here
-    self.temps.insert(dest.clone(), src);
+    match &dest.0 {
+      TempID::Reg(_) => {
+        *self.temps.get_mut(dest).unwrap() = src;
+      },
+
+      TempID::Num(_) => {
+        if self.temps.insert(dest.clone(), src).is_some() {
+          println!("Warning: {} is a SSA constant", dest)
+        }
+      },
+    }
   }
 }
 
@@ -58,7 +74,7 @@ impl ProgContext {
     let Func { params, blocks, .. } = self.prog.get(&name).unwrap();
     let mut prev_block = None;
     let mut curr_block = BlockID(0);
-    let mut store = TempStore { temps: FxHashMap::default() };
+    let mut store = TempStore::new();
 
     // Insert Arguments as Params
     for (param, arg) in params.iter().zip_eq(args.into_iter()) {
@@ -96,10 +112,10 @@ impl ProgContext {
             if let Some(prev) = prev_block {
               let pred_idx = preds.iter().position(|&x| x == prev).unwrap();
               let src = srcs.get(pred_idx).unwrap();
-              store.save(dest, store.get_op64(src));
+              store.update(dest, store.get_op64(src));
     
             } else {
-              panic!("First Block Executed has Phi Functions"); // TODO: Better Method for Canceling
+              panic!("First Block Executed has Phi Functions");
             }
           },
 

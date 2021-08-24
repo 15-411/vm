@@ -5,12 +5,26 @@ use itertools::Itertools;
 
 use crate::ops::{BinOp, UnOp};
 
+use super::reg::Register;
 
-// TODO: Consider extending to have named temporaries
-// Instead of t0, t1, could have t_retval or something similar
-// If allowed, maybe should use a different prefix (LLVM uses %)
+
 #[derive(DebugFromDisplay, Clone, Hash, PartialEq, Eq)]
-pub struct Temp(pub u64);
+pub enum TempID {
+  Num(u64),
+  Reg(Register),
+}
+
+impl Display for TempID {
+  fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+    match self {
+      Self::Num(val) => write!(f, "#{}", val),
+      Self::Reg(val) => write!(f, "#{}", val),
+    }
+  }
+}
+
+#[derive(DebugFromDisplay, Clone, Hash, PartialEq, Eq)]
+pub struct Temp(pub TempID);
 
 impl Display for Temp {
   fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
