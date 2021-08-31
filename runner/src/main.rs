@@ -2,7 +2,7 @@
 mod util;
 
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::Instant;
 use std::ffi::{OsStr, OsString};
 use std::fs::File;
