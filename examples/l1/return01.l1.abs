@@ -1,4 +1,4 @@
-// Returns 5
+// return 5
 // cargo run --bin main -- examples/l1/return01.l1.abs
 
 main()

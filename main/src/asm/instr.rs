@@ -5,10 +5,10 @@ use itertools::Itertools;
 
 use crate::ops::{BinOp, UnOp};
 
-use super::reg::Register;
+use super::{blocks::BlockID, reg::Register};
 
 
-#[derive(DebugFromDisplay, Clone, Hash, PartialEq, Eq)]
+#[derive(DebugFromDisplay, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TempID {
   Num(u64),
   Reg(Register),
@@ -17,18 +17,18 @@ pub enum TempID {
 impl Display for TempID {
   fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
     match self {
-      Self::Num(val) => write!(f, "#{}", val),
-      Self::Reg(val) => write!(f, "#{}", val),
+      Self::Num(val) => write!(f, "{}", val),
+      Self::Reg(val) => write!(f, "{}", val),
     }
   }
 }
 
-#[derive(DebugFromDisplay, Clone, Hash, PartialEq, Eq)]
+#[derive(DebugFromDisplay, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Temp(pub TempID);
 
 impl Display for Temp {
   fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-    write!(f, "t{}", self.0)
+    write!(f, "#{}", self.0)
   }
 }
 
@@ -72,6 +72,11 @@ pub enum Instr {
     src: Operand,
   },
   
+  If {
+    cond: Operand,
+    block: BlockID,
+  },
+
   Phi {
     dest: Temp,
     srcs: Vec<Operand>,
@@ -83,6 +88,12 @@ pub enum Instr {
     dest: Option<Temp>,
     src: Vec<Operand>,
   },
+
+  Print {
+    value: Operand
+  },
+
+  Dump
 }
 
 impl Display for Instr {
@@ -92,11 +103,14 @@ impl Display for Instr {
         write!(f, "{} = {} {} {}", dest, src1, op, src2),
       Self::UnOp { dest, op, src } => write!(f, "{} = {}{}", dest, op, src),
       Self::Mov { dest, src } => write!(f, "{} = {}", dest, src),
-      Self::Phi { dest, srcs } => write!(f, "{} = phi{}", dest, srcs.iter().format(" ")),
+      Self::If { cond, block } => write!(f, "if {} {}", cond, block),
+      Self::Phi { dest, srcs } => write!(f, "{} = phi {}", dest, srcs.iter().format(" ")),
       Self::Call { dest: Some(dest), src, name } =>
-        write!(f, "{} = {}({:?})", dest, name, src),
+        write!(f, "{} = call {} {}", dest, name, src.iter().format(" ")),
       Self::Call { dest: None, src, name } =>
-        write!(f, "{}({})", name, src.iter().format(", ")),
+        write!(f, "call {} {}", name, src.iter().format(", ")),
+      Self::Print { value } => write!(f, "print {}", value),
+      Self::Dump => write!(f, "dump"),
     }
   }
 }

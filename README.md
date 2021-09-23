@@ -41,4 +41,4 @@ cargo build [--release]
 Come back for more information about extending the VM to include you're own instructions and functionality.
 
 ## Abstract Assembly Structure
-For more information about the structure of the abstract assembly language, please take a look at the `format.txt` located in the VM repo.
+For more information about the structure of the abstract assembly language, please take a look at the `format.md` Markdown file located in the VM repo.

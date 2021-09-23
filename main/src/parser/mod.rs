@@ -143,7 +143,17 @@ impl<'a> Parser<'a> {
             }
 
             Ok(Instr::Phi { dest, srcs })
-          }
+          },
+
+          Token::Call => {
+            let name = self.name()?;
+            let mut params = vec![];
+            while self.peek()? != Token::NewLine {
+              params.push(self.operand()?);
+            }
+            
+            Ok(Instr::Call { dest: Some(dest), name, src: params })
+          },
 
           Token::Temp(val) =>
             self.mov_binop_instr(dest, Operand::Temp(Temp(val))),
@@ -153,8 +163,29 @@ impl<'a> Parser<'a> {
         }
       },
 
+      Token::If => {
+        let cond = self.operand()?;
+        let block = self.block()?;
+        Ok(Instr::If { cond, block })
+      },
+
+      Token::Print => {
+        let value = self.operand()?;
+        Ok(Instr::Print { value })
+      },
+
+      Token::Dump => {
+        Ok(Instr::Dump)
+      },
+
       Token::Call => {
-        todo!()
+        let name = self.name()?;
+        let mut params = vec![];
+        while self.peek()? != Token::NewLine {
+          params.push(self.operand()?);
+        }
+        
+        Ok(Instr::Call { dest: None, name, src: params })
       },
 
       _ => unreachable!(),
@@ -185,7 +216,7 @@ impl<'a> Parser<'a> {
         Branch::Ret(temp_opt)
       },
 
-      Token::If => {
+      Token::Cmp => {
         let cond = {
           let loper = self.operand()?;
           if matches!(self.peek()?, Token::Block(_)) {

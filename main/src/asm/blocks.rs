@@ -28,7 +28,7 @@ pub struct BlockID(pub u64);
 
 impl Display for BlockID {
   fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-    write!(f, "B{}", self.0)
+    write!(f, "@{}", self.0)
   }
 }
 
@@ -45,7 +45,7 @@ impl Display for Branch {
     match self {
       Self::Cond(cond, true_block, false_block) =>
         write!(f, "cmp {} ({}, {})", cond, true_block, false_block),
-      Self::Jump(block) => write!(f, "jump {}", block),
+      Self::Jump(block) => write!(f, "jmp {}", block),
       Self::Ret(None) => write!(f, "ret"),
       Self::Ret(Some(val)) => write!(f, "ret {}", val),
     }

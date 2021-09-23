@@ -1,4 +1,4 @@
-// Returns div-by-zero
+// div-by-zero
 // cargo run --bin main -- examples/l1/runtime_error01.l1.abs
 
 main()

@@ -1,3 +1,4 @@
+use chrono::Local;
 use fxhash::FxHashMap;
 use itertools::Itertools;
 
@@ -8,7 +9,7 @@ use crate::asm::reg::Register;
 
 
 struct TempStore {
-  pub temps: FxHashMap<Temp, u64>,
+  pub temps: FxHashMap<Temp, i32>,
 }
 
 impl TempStore {
@@ -21,36 +22,39 @@ impl TempStore {
     TempStore { temps }    
   }
 
-  fn get_op64(&self, op: &Operand) -> u64 {
+  // fn get_op64(&self, op: &Operand) -> u64 {
+  //   match op {
+  //     Operand::Const(val) => *val as u64,
+  //     Operand::Temp(temp) => *self.temps.get(temp).unwrap(),
+  //   }
+  // }
+
+  fn get(&self, op: &Operand) -> i32 {
     match op {
-      Operand::Const(val) => *val as u64,
+      Operand::Const(val) => *val,
       Operand::Temp(temp) => *self.temps.get(temp).unwrap(),
     }
   }
 
-  fn get_op32(&self, op: &Operand) -> i32 {
-    match op {
-      Operand::Const(val) => *val,
-      Operand::Temp(temp) => *self.temps.get(temp).unwrap() as i32,
-    }
-  }
-
-  fn update(&mut self, dest: &Temp, src: u64) {
+  fn update(&mut self, dest: &Temp, src: i32) {
     *self.temps.get_mut(dest).unwrap() = src;
   }
 
-  fn save(&mut self, dest: &Temp, src: u64) {
-    // TODO: Can switch between SSA and non-SSA here
+  fn save(&mut self, dest: &Temp, src: i32) {
     match &dest.0 {
       TempID::Reg(_) => {
         *self.temps.get_mut(dest).unwrap() = src;
       },
 
       TempID::Num(_) => {
-        if self.temps.insert(dest.clone(), src).is_some() {
-          println!("Warning: {} is a SSA constant", dest)
-        }
+        self.temps.insert(dest.clone(), src);
       },
+    }
+  }
+
+  fn dump(&self) {
+    for (name, value) in self.temps.iter().sorted_unstable() {
+      println!("  {}\t= {}", name, value);
     }
   }
 }
@@ -70,7 +74,7 @@ pub struct ProgContext {
 }
 
 impl ProgContext {
-  fn run_func(&self, name: String, args: Vec<u64>) -> ReturnType {
+  fn run_func(&self, name: String, args: Vec<i32>) -> ReturnType {
     let Func { params, blocks, .. } = self.prog.get(&name).unwrap();
     let mut prev_block = None;
     let mut curr_block = BlockID(0);
@@ -82,7 +86,7 @@ impl ProgContext {
     }
 
     // Run Function Blocks
-    loop {
+    'outer: loop {
       let BasicBlock { preds, lines, branch, .. } 
         = blocks.get(curr_block.0 as usize).unwrap();
 
@@ -90,29 +94,37 @@ impl ProgContext {
       for line in lines {
         match line {
           Instr::BinOp { op, dest, src1, src2 } => {
-            let src1_val = store.get_op32(src1);
-            let src2_val = store.get_op32(src2);
+            let src1_val = store.get(src1);
+            let src2_val = store.get(src2);
             store.save(dest, match op.eval(src1_val, src2_val) {
-              Some(val) => val as u64,
+              Some(val) => val,
               None => return ReturnType::DivByZero,
             });
           },
 
           Instr::UnOp  { op, dest, src } => {
-            let dest_val = op.eval(store.get_op32(src));
-            store.save(dest, dest_val as u64);
+            let dest_val = op.eval(store.get(src));
+            store.save(dest, dest_val);
           },
 
           Instr::Mov   { dest, src } => {
-            let src_val = store.get_op64(src);
+            let src_val = store.get(src);
             store.save(dest, src_val);
+          },
+
+          Instr::If    { cond, block } => {
+            if store.get(cond) != 0 { 
+              prev_block = Some(curr_block);
+              curr_block = *block;
+              continue 'outer;
+            }
           },
 
           Instr::Phi   { dest, srcs } => {
             if let Some(prev) = prev_block {
               let pred_idx = preds.iter().position(|&x| x == prev).unwrap();
               let src = srcs.get(pred_idx).unwrap();
-              store.update(dest, store.get_op64(src));
+              store.update(dest, store.get(src));
     
             } else {
               panic!("First Block Executed has Phi Functions");
@@ -120,12 +132,23 @@ impl ProgContext {
           },
 
           Instr::Call  { name, dest, src } => {
-            match self.run_func(name.clone(), src.iter().map(|x| store.get_op64(x)).collect()) {
+            match self.run_func(name.clone(), src.iter().map(|x| store.get(x)).collect()) {
               ReturnType::Return(val) => if let Some(dest) = dest {
-                store.save(dest,  val as u64);
+                store.save(dest,  val);
               },
               other => return other,
             }
+          },
+
+          Instr::Print { value } => {
+            // TODO: Include Line Number
+            println!("[{}] {} = {}", Local::now().time().format("%H:%M:%S"), value, store.get(value));
+          },
+
+          Instr::Dump => {
+            // TODO: Include Line Number
+            println!("[{}] Dump of All Temps", Local::now().time().format("%H:%M:%S"));
+            store.dump();
           },
         }
       }
@@ -133,7 +156,7 @@ impl ProgContext {
       // Path Handling
       match branch {
         Branch::Ret(None) => return ReturnType::Return(0),  // Doesnt Matter if No Dest
-        Branch::Ret(Some(ret)) => return ReturnType::Return(store.get_op64(ret) as i32),
+        Branch::Ret(Some(ret)) => return ReturnType::Return(store.get(ret)),
         Branch::Jump(bidx) => { 
           prev_block = Some(curr_block);
           curr_block = *bidx;
@@ -142,11 +165,11 @@ impl ProgContext {
         Branch::Cond(cond, tidx, fidx) => {
           let cond_val = match cond {
             Cond::BinOp(src1, op, src2) =>
-              match op.eval(store.get_op32(src1), store.get_op32(src2)) {
-                Some(val) => val as u64,
+              match op.eval(store.get(src1), store.get(src2)) {
+                Some(val) => val,
                 None => return ReturnType::DivByZero,
               },
-            Cond::Value(src) => store.get_op64(src),
+            Cond::Value(src) => store.get(src),
           };
 
           let block = if cond_val == 0 { fidx } else { tidx };
