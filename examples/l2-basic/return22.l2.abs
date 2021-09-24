@@ -1,0 +1,27 @@
+// return 34
+// Test case l2-basic/return22.l2
+// Run via `cargo run --bin main -- examples/l2-basic/return22.l2.abs`
+
+main
+  @0  
+    jmp @2
+
+  @2  @3 @0
+    #1 = phi #2 3
+    #3 = phi #0 1
+    #0 = phi #4 1
+    cmp #1 <= 9 @3 @4
+
+  @3  @2
+    #4 = #0 + #3
+    #2 = #1 + 1
+    jmp @2
+
+  @4  @2
+    cmp #1 > 0 @5 @6
+
+  @5  @4
+    ret #0
+
+  @6  @4
+    ret 0

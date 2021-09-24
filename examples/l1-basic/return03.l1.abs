@@ -1,0 +1,10 @@
+// return -1
+// Test case l1-basic/return03.l1
+// Run abs via `cargo run --bin main -- examples/l1-basic/return03.l1.abs`
+
+main
+  #1 = --2147483648
+  #4 = #1 - 1
+  #6 = -#1
+  #9 = #6 + #4
+  ret #9

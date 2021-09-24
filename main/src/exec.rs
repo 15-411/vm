@@ -36,10 +36,6 @@ impl TempStore {
     }
   }
 
-  fn update(&mut self, dest: &Temp, src: i32) {
-    *self.temps.get_mut(dest).unwrap() = src;
-  }
-
   fn save(&mut self, dest: &Temp, src: i32) {
     match &dest.0 {
       TempID::Reg(_) => {
@@ -88,7 +84,7 @@ impl ProgContext {
     // Run Function Blocks
     'outer: loop {
       let BasicBlock { preds, lines, branch, .. } 
-        = blocks.get(curr_block.0 as usize).unwrap();
+        = blocks.get(&curr_block).unwrap();
 
       // Evaluate Operations
       for line in lines {
@@ -124,7 +120,7 @@ impl ProgContext {
             if let Some(prev) = prev_block {
               let pred_idx = preds.iter().position(|&x| x == prev).unwrap();
               let src = srcs.get(pred_idx).unwrap();
-              store.update(dest, store.get(src));
+              store.save(dest, store.get(src));
     
             } else {
               panic!("First Block Executed has Phi Functions");

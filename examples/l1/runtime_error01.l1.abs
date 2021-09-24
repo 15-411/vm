@@ -1,7 +1,0 @@
-// div-by-zero
-// cargo run --bin main -- examples/l1/runtime_error01.l1.abs
-
-main()
-  #3 = 3 + 3
-  #7 = #3 / 0
-  ret #7

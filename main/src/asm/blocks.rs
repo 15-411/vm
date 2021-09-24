@@ -1,6 +1,7 @@
 use std::fmt::{Display, Error, Formatter};
 
 use derives::DebugFromDisplay;
+use fxhash::FxHashMap;
 use itertools::Itertools;
 
 use crate::ops::BinOp;
@@ -77,14 +78,14 @@ impl Display for BasicBlock {
 pub struct Func {
   pub name: String,
   pub params: Vec<Temp>,
-  pub blocks: Vec<BasicBlock>,
+  pub blocks: FxHashMap<BlockID, BasicBlock>,
 }
 
 impl Display for Func {
   fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
     writeln!(f, "{}({}):", self.name, self.params.iter().format(", "))?;
 
-    for block in self.blocks.iter() {
+    for (_, block) in self.blocks.iter() {
       writeln!(f, "{}", block)?;
     }
 

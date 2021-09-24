@@ -1,0 +1,7 @@
+// div-by-zero
+// Test case l1-basic/exception01.l1
+// Run abs via `cargo run --bin main -- examples/l1-basic/exception01.l1.abs`
+
+main
+  #2 = 1 / 0
+  ret #2

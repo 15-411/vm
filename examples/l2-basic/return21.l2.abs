@@ -1,0 +1,20 @@
+// return 5050
+// Test case l2-basic/return21.l2
+// Run via `cargo run --bin main -- examples/l2-basic/return21.l2.abs`
+
+main
+  @0  
+    jmp @2
+
+  @2  @3 @0
+    #0 = phi #1 0
+    #2 = phi #3 0
+    cmp #0 <= 100 @3 @4
+
+  @3  @2
+    #3 = #2 + #0
+    #1 = #0 + 1
+    jmp @2
+
+  @4  @2
+    ret #2

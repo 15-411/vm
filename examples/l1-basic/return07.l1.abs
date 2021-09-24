@@ -1,0 +1,6 @@
+// return 0
+// Test case l1-basic/return07.l1
+// Run via `cargo run --bin main -- examples/l1-basic/return07.l1.abs`
+
+main
+  ret 0
