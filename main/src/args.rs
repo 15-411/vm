@@ -11,9 +11,9 @@ pub struct Config {
   #[structopt(short="v")]
   pub verbose: bool,
 
-  /// Enable Strict SSA Mode
-  #[structopt(long="ssa")]
-  pub ssa: bool,
+  // /// Enable Strict SSA Mode
+  // #[structopt(long="ssa")]
+  // pub ssa: bool,  // TODO: Include some sort of SSA mode
 
   /// Input Directory of Test Cases
   #[structopt(name = "FILE", parse(from_os_str))]

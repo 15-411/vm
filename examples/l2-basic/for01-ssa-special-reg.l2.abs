@@ -1,0 +1,65 @@
+// return 11111110
+// Test case l2-basic/for01.l2
+// Run via `cargo run --bin main -- examples/l2-basic/for01.l2.abs`
+
+main
+  @0  
+    jmp @2
+
+  @2  @13 @0
+    #9 = phi #0 1
+    #4 = phi #3 0
+    #6 = phi #7 254
+    cmp #6 > 0 @3 @4
+
+  @3  @2
+    #eax = #6
+    #edx = 0 
+    #r11d = 2
+    #edx = #eax % #r11d
+    #12 = #edx
+    cmp #12 == 0 @5 @6
+
+  @4  @2
+    ret #4
+
+  @5  @3
+    jmp @7
+
+  @6  @3
+    jmp @7
+
+  @7  @5 @6
+    #8 = phi 0 1
+    cmp #9 < 0 @8 @9
+
+  @8  @7
+    #eax = 1
+    #edx = 0 
+    #r11d = 0
+    #edx = #eax % #r11d
+    #10 = #edx    
+    ret #10
+
+  @9  @7
+    #11 = !#8
+    cmp #11 @11 @12
+
+  @11  @9
+    #1 = #9 * 10
+    jmp @13
+
+  @12  @9
+    #5 = #9 + #4
+    #2 = #9 * 10
+    jmp @13
+
+  @13  @11 @12
+    #0 = phi #1 #2
+    #3 = phi #4 #5
+    #eax = #6
+    #edx = 0 
+    #r11d = 2
+    #edx = #eax % #r11d
+    #7 = #edx
+    jmp @2

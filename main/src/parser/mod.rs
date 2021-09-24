@@ -143,7 +143,17 @@ impl<'a> Parser<'a> {
             }
 
             Ok(Instr::Phi { dest, srcs })
-          }
+          },
+
+          Token::Call => {
+            let name = self.name()?;
+            let mut params = vec![];
+            while self.peek()? != Token::NewLine {
+              params.push(self.operand()?);
+            }
+            
+            Ok(Instr::Call { dest: Some(dest), name, src: params })
+          },
 
           Token::Temp(val) =>
             self.mov_binop_instr(dest, Operand::Temp(Temp(val))),
@@ -153,8 +163,29 @@ impl<'a> Parser<'a> {
         }
       },
 
+      Token::If => {
+        let cond = self.operand()?;
+        let block = self.block()?;
+        Ok(Instr::If { cond, block })
+      },
+
+      Token::Print => {
+        let value = self.operand()?;
+        Ok(Instr::Print { value })
+      },
+
+      Token::Dump => {
+        Ok(Instr::Dump)
+      },
+
       Token::Call => {
-        todo!()
+        let name = self.name()?;
+        let mut params = vec![];
+        while self.peek()? != Token::NewLine {
+          params.push(self.operand()?);
+        }
+        
+        Ok(Instr::Call { dest: None, name, src: params })
       },
 
       _ => unreachable!(),
@@ -166,7 +197,7 @@ impl<'a> Parser<'a> {
 
     loop {
       match self.peek()? {
-        Token::Ret | Token::Jmp | Token::If => break,
+        Token::Ret | Token::Jmp | Token::Cmp => break,
         _ => {
           lines.push(self.instr()?);
           self.skip_opt_newlines();
@@ -185,7 +216,7 @@ impl<'a> Parser<'a> {
         Branch::Ret(temp_opt)
       },
 
-      Token::If => {
+      Token::Cmp => {
         let cond = {
           let loper = self.operand()?;
           if matches!(self.peek()?, Token::Block(_)) {
@@ -211,8 +242,8 @@ impl<'a> Parser<'a> {
     Ok((lines, branch))
   }
 
-  fn blocks(&mut self) -> Result<Vec<BasicBlock>> {
-    let mut blocks = vec![];
+  fn blocks(&mut self) -> Result<FxHashMap<BlockID, BasicBlock>> {
+    let mut blocks = FxHashMap::default();
 
     loop {
       match self.peek() {
@@ -224,29 +255,15 @@ impl<'a> Parser<'a> {
           let id = self.block()?;
           // println!("Block {:?}", self.lexer.clone().into_iter().collect::<Vec<_>>());
           // Parse List of Predecessors
-          let preds = if self.peek()? == Token::Colon {
-            self.munch(Token::Colon)?;
+          let mut preds = vec![];
+          while self.peek()? != Token::NewLine {
+            preds.push(self.block()?);
+          }
 
-            let mut preds = vec![];
-            loop {
-              match self.token()? {
-                Token::Block(val) => preds.push(BlockID(val)),
-                Token::NewLine => break,
-                _ => return err("Invalid Block Predecessor List"),
-              }
-            }
-
-            preds
-            
-          } else {
-            self.munch(Token::NewLine)?;
-            vec![]
-          };
-
-          self.skip_opt_newlines();
+          self.skip_newlines()?;
           // println!("After Preds {:?}", self.lexer.clone().into_iter().collect::<Vec<_>>());
           let (lines, branch) = self.block_inner()?;
-          blocks.push(BasicBlock { id, preds, lines, branch })
+          blocks.insert(id, BasicBlock { id, preds, lines, branch });
         },
 
         _ => return err("Invalid Block Header"),
@@ -256,34 +273,22 @@ impl<'a> Parser<'a> {
   
   fn func(&mut self) -> Result<Func> {
     let name = self.name()?;
-    self.munch(Token::LParen)?;
 
     // Parse List of Parameters
-    let params = if self.peek()? == Token::RParen {
-      self.skip()?;
-      vec![]
-
-    } else {
-      let mut params = vec![];
-      loop {
-        params.push(self.temp()?);
-
-        match self.token()? {
-          Token::RParen => break,
-          Token::Comma => (),
-          _ => return err("Invalid Function Param Separator"),
-        }
-      }
-
-      params
-    };
+    let mut params = vec![];
+    while self.peek()? != Token::NewLine {
+      params.push(self.temp()?);
+    }
 
     self.skip_newlines()?;
 
     // Parser Blocks (or single block)
     let blocks = if matches!(self.peek()?, Token::Temp(_) | Token::Ret) { 
+      let mut map = FxHashMap::default();
       let (lines, branch) = self.block_inner()?;
-      vec![BasicBlock { id: BlockID(0), preds: vec![], lines, branch }]      
+      map.insert(BlockID(0), BasicBlock { id: BlockID(0), preds: vec![], lines, branch });
+      map
+    
     } else {
       self.blocks()?
     };

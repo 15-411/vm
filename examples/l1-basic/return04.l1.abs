@@ -1,0 +1,12 @@
+// return 21
+// Test case l1-basic/return04.l1
+// Run via `cargo run --bin main -- examples/l1-basic/return04.l1.abs`
+
+main
+  #4 = 1 + 1
+  #7 = #4 + 1
+  #10 = #7 + #4
+  #13 = #10 + #7
+  #16 = #13 + #10
+  #19 = #16 + #13
+  ret #19

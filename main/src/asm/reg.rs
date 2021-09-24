@@ -46,7 +46,7 @@ impl Display for Register {
   fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
     use Register::*;
 
-    write!(f, "%{}", match self {
+    write!(f, "{}", match self {
       EAX  => "eax",
       EBX  => "ebx",
       ECX  => "ecx",
