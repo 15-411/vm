@@ -24,6 +24,7 @@ instr = temp "=" oper                     "\n"
 
 # Branch Condition / Operation
 branch = "ret" oper                       "\n"
+       | "ret" 				  "\n"
        | "jmp" branch_id                  "\n"
        | "if" oper branch_id branch_id    "\n"
 
