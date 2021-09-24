@@ -31,7 +31,7 @@ fn = id temp* "\n" instr* branch
 
 #### Basic Block
 ```
-block = block_id "\n" instr* branch              # No Predecessors
+block = block_id "\n" instr* branch     # No Predecessors
       | block_id+ "\n" instr* branch    # With Predecessors
 ```
 
