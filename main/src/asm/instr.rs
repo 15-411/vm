@@ -53,7 +53,7 @@ impl Display for Operand {
 
 
 #[derive(Debug, Clone)]
-pub enum Instr {
+pub enum InstrKind {
   BinOp {
     op: BinOp,
     dest: Temp,
@@ -82,7 +82,6 @@ pub enum Instr {
     srcs: Vec<Operand>,
   },
 
-  // Not all function calls return a value
   Call {
     name: String,
     dest: Option<Temp>,
@@ -96,21 +95,33 @@ pub enum Instr {
   Dump
 }
 
-impl Display for Instr {
+impl Display for InstrKind {
   fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
     match self {
-      Self::BinOp { op, dest, src1, src2 } =>
+      Self::BinOp { op, dest, src1, src2, .. } =>
         write!(f, "{} = {} {} {}", dest, src1, op, src2),
-      Self::UnOp { dest, op, src } => write!(f, "{} = {}{}", dest, op, src),
-      Self::Mov { dest, src } => write!(f, "{} = {}", dest, src),
-      Self::If { cond, block } => write!(f, "if {} {}", cond, block),
-      Self::Phi { dest, srcs } => write!(f, "{} = phi {}", dest, srcs.iter().format(" ")),
-      Self::Call { dest: Some(dest), src, name } =>
+      Self::UnOp { dest, op, src, .. } => write!(f, "{} = {}{}", dest, op, src),
+      Self::Mov { dest, src, .. } => write!(f, "{} = {}", dest, src),
+      Self::If { cond, block, .. } => write!(f, "if {} {}", cond, block),
+      Self::Phi { dest, srcs, .. } => write!(f, "{} = phi {}", dest, srcs.iter().format(" ")),
+      Self::Call { dest: Some(dest), src, name, .. } =>
         write!(f, "{} = call {} {}", dest, name, src.iter().format(" ")),
-      Self::Call { dest: None, src, name } =>
+      Self::Call { dest: None, src, name, .. } =>
         write!(f, "call {} {}", name, src.iter().format(", ")),
-      Self::Print { value } => write!(f, "print {}", value),
-      Self::Dump => write!(f, "dump"),
+      Self::Print { value, .. } => write!(f, "print {}", value),
+      Self::Dump { .. } => write!(f, "dump"),
     }
+  }
+}
+
+#[derive(Clone, Debug)]
+pub struct Instr {
+  pub line: u64,
+  pub kind: InstrKind,
+}
+
+impl Display for Instr {
+  fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+    write!(f, "{}", self.kind)
   }
 }

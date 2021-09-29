@@ -35,21 +35,33 @@ impl Display for BlockID {
 
 
 #[derive(Debug, Clone)]
-pub enum Branch {
+pub enum BranchKind {
   Cond(Cond, BlockID, BlockID),
   Jump(BlockID),
   Ret(Option<Operand>),
 }
 
-impl Display for Branch {
+impl Display for BranchKind {
   fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
     match self {
       Self::Cond(cond, true_block, false_block) =>
-        write!(f, "cmp {} ({}, {})", cond, true_block, false_block),
+        write!(f, "cmp {} {} {}", cond, true_block, false_block),
       Self::Jump(block) => write!(f, "jmp {}", block),
       Self::Ret(None) => write!(f, "ret"),
       Self::Ret(Some(val)) => write!(f, "ret {}", val),
     }
+  }
+}
+
+#[derive(Debug, Clone)]
+pub struct Branch {
+  pub kind: BranchKind,
+  pub line: u64,
+}
+
+impl Display for Branch {
+  fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+    write!(f, "{}", self.kind)
   }
 }
 
@@ -60,17 +72,18 @@ pub struct BasicBlock {
   pub preds: Vec<BlockID>,
   pub lines: Vec<Instr>,
   pub branch: Branch,
+  pub line_start: u64,
 }
 
 impl Display for BasicBlock {
   fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-    writeln!(f, "  {}({}):", self.id, self.preds.iter().format(", "))?;
+    writeln!(f, "{:0>2}    {} ({}):", self.line_start, self.id, self.preds.iter().format(", "))?;
 
     for instr in self.lines.iter() {
-      writeln!(f, "  {}", instr)?;
+      writeln!(f, "{:0>2}      {}", instr.line, instr)?;
     }
 
-    writeln!(f, "  {}", self.branch)
+    writeln!(f, "{:0>2}      {}", self.branch.line, self.branch)
   }
 }
 
@@ -79,11 +92,12 @@ pub struct Func {
   pub name: String,
   pub params: Vec<Temp>,
   pub blocks: FxHashMap<BlockID, BasicBlock>,
+  pub line_start: u64,
 }
 
 impl Display for Func {
   fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-    writeln!(f, "{}({}):", self.name, self.params.iter().format(", "))?;
+    writeln!(f, "{:0>2}  {} {}", self.line_start, self.name, self.params.iter().format(" "))?;
 
     for (_, block) in self.blocks.iter() {
       writeln!(f, "{}", block)?;

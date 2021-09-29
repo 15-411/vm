@@ -3,8 +3,8 @@ use fxhash::FxHashMap;
 use itertools::Itertools;
 
 use crate::asm::ASM;
-use crate::asm::blocks::{Func, BlockID, BasicBlock, Branch, Cond};
-use crate::asm::instr::{Temp, Operand, Instr, TempID};
+use crate::asm::blocks::{Func, BlockID, BasicBlock, BranchKind, Cond};
+use crate::asm::instr::{Temp, Operand, InstrKind, TempID};
 use crate::asm::reg::Register;
 
 
@@ -88,8 +88,8 @@ impl ProgContext {
 
       // Evaluate Operations
       for line in lines {
-        match line {
-          Instr::BinOp { op, dest, src1, src2 } => {
+        match &line.kind {
+          InstrKind::BinOp { op, dest, src1, src2 } => {
             let src1_val = store.get(src1);
             let src2_val = store.get(src2);
             store.save(dest, match op.eval(src1_val, src2_val) {
@@ -98,17 +98,17 @@ impl ProgContext {
             });
           },
 
-          Instr::UnOp  { op, dest, src } => {
+          InstrKind::UnOp  { op, dest, src } => {
             let dest_val = op.eval(store.get(src));
             store.save(dest, dest_val);
           },
 
-          Instr::Mov   { dest, src } => {
+          InstrKind::Mov   { dest, src } => {
             let src_val = store.get(src);
             store.save(dest, src_val);
           },
 
-          Instr::If    { cond, block } => {
+          InstrKind::If    { cond, block } => {
             if store.get(cond) != 0 { 
               prev_block = Some(curr_block);
               curr_block = *block;
@@ -116,7 +116,7 @@ impl ProgContext {
             }
           },
 
-          Instr::Phi   { dest, srcs } => {
+          InstrKind::Phi   { dest, srcs } => {
             if let Some(prev) = prev_block {
               let pred_idx = preds.iter().position(|&x| x == prev).unwrap();
               let src = srcs.get(pred_idx).unwrap();
@@ -127,7 +127,7 @@ impl ProgContext {
             }
           },
 
-          Instr::Call  { name, dest, src } => {
+          InstrKind::Call  { name, dest, src } => {
             match self.run_func(name.clone(), src.iter().map(|x| store.get(x)).collect()) {
               ReturnType::Return(val) => if let Some(dest) = dest {
                 store.save(dest,  val);
@@ -136,29 +136,27 @@ impl ProgContext {
             }
           },
 
-          Instr::Print { value } => {
-            // TODO: Include Line Number
-            println!("[{}] {} = {}", Local::now().time().format("%H:%M:%S"), value, store.get(value));
+          InstrKind::Print { value } => {
+            println!("[{}] Line {}: {} = {}", Local::now().time().format("%H:%M:%S"), line.line, value, store.get(value));
           },
 
-          Instr::Dump => {
-            // TODO: Include Line Number
-            println!("[{}] Dump of All Temps", Local::now().time().format("%H:%M:%S"));
+          InstrKind::Dump => {
+            println!("[{}] Line {}: Dump of All Temps", line.line, Local::now().time().format("%H:%M:%S"));
             store.dump();
           },
         }
       }
 
       // Path Handling
-      match branch {
-        Branch::Ret(None) => return ReturnType::Return(0),  // Doesnt Matter if No Dest
-        Branch::Ret(Some(ret)) => return ReturnType::Return(store.get(ret)),
-        Branch::Jump(bidx) => { 
+      match &branch.kind {
+        BranchKind::Ret(None) => return ReturnType::Return(0),  // Doesnt Matter if No Dest
+        BranchKind::Ret(Some(ret)) => return ReturnType::Return(store.get(ret)),
+        BranchKind::Jump(bidx) => { 
           prev_block = Some(curr_block);
           curr_block = *bidx;
         },
 
-        Branch::Cond(cond, tidx, fidx) => {
+        BranchKind::Cond(cond, tidx, fidx) => {
           let cond_val = match cond {
             Cond::BinOp(src1, op, src2) =>
               match op.eval(store.get(src1), store.get(src2)) {

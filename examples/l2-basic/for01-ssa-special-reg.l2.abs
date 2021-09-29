@@ -1,6 +1,6 @@
 // return 11111110
 // Test case l2-basic/for01.l2
-// Run via `cargo run --bin main -- examples/l2-basic/for01.l2.abs`
+// Run via `cargo run --bin main -- examples/l2-basic/for01-ssa-special-reg.l2.abs`
 
 main
   @0  

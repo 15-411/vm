@@ -8,8 +8,8 @@ use fxhash::FxHashMap;
 use logos::{Logos, Lexer};
 
 use crate::asm::ASM;
-use crate::asm::blocks::{Func, BasicBlock, BlockID, Branch, Cond};
-use crate::asm::instr::{Instr, Operand, Temp};
+use crate::asm::blocks::{Func, BasicBlock, BlockID, Branch, BranchKind, Cond};
+use crate::asm::instr::{InstrKind, Instr, Operand, Temp};
 
 use lexer::Token;
 use error::{Result, Error, errs, err};
@@ -19,6 +19,7 @@ use utils::{unop_code, binop_code};
 #[derive(Clone)]
 struct Parser<'a> {
   lexer: Peekable<Lexer<'a, Token>>,
+  cur_line: u64
 }
 
 impl<'a> Parser<'a> {
@@ -32,9 +33,8 @@ impl<'a> Parser<'a> {
   /// Look at the next token in the lexer stream.
   /// This function NEVER moves the lexer, and can be called multiple times
   /// and will return the same result.
-  fn peek(&mut self) -> Result<Token> {
-    // TODO: Unstable use function .cloned() instead of map
-    self.lexer.peek().ok_or(Error::EOF).map(|x| x.clone())
+  fn peek(&mut self) -> Result<&Token> {
+    self.lexer.peek().ok_or(Error::EOF)
   }
 
   // Skips to the next token without checking what it is
@@ -45,14 +45,16 @@ impl<'a> Parser<'a> {
 
   fn skip_newlines(&mut self) -> Result<()> {
     self.munch(Token::NewLine)?;
-    self.skip_opt_newlines();
+    self.cur_line += 1;
 
+    self.skip_opt_newlines();
     Ok(())
   }
 
   fn skip_opt_newlines(&mut self) {
     while matches!(self.peek(), Ok(Token::NewLine)) {
       self.skip().expect("Should Always Work");
+      self.cur_line += 1;
     }
   }
 
@@ -107,13 +109,18 @@ impl<'a> Parser<'a> {
 
   fn mov_binop_instr(&mut self, dest: Temp, lsrc: Operand) -> Result<Instr> {
     match self.token()? {
-      Token::NewLine => Ok(Instr::Mov { dest, src: lsrc }),
+      Token::NewLine => {
+        self.cur_line += 1;
+        Ok(Instr { kind: InstrKind::Mov { dest, src: lsrc }, line: self.cur_line - 1 })
+      },
+      
       tok => {
         let op = binop_code(tok)?;
         let src2 = self.operand()?;
 
         self.munch(Token::NewLine)?;
-        Ok(Instr::BinOp { dest, op, src1: lsrc, src2 })
+        self.cur_line += 1;
+        Ok(Instr { kind: InstrKind::BinOp { dest, op, src1: lsrc, src2 }, line: self.cur_line - 1 })
       }
     }
   }
@@ -128,31 +135,35 @@ impl<'a> Parser<'a> {
           op @ (Token::Sub | Token::LogNot | Token::BitNot) => {
             let src = self.operand()?;
             self.munch(Token::NewLine)?;
-            Ok(Instr::UnOp { dest, src, op: unop_code(op)? })
+            self.cur_line += 1;
+
+            Ok(Instr { 
+              kind: InstrKind::UnOp { dest, src, op: unop_code(op)? }, 
+              line: self.cur_line - 1 
+            })
           },
 
           Token::Phi => {
             let mut srcs = vec![];
-            loop {
+            while !matches!(self.peek()?, Token::NewLine) {
               match self.token()? {
                 Token::Temp(val) => { srcs.push(Operand::Temp(Temp(val))); },
                 Token::Const(val) => { srcs.push(Operand::Const(val)); },
-                Token::NewLine => break,
                 _ => unreachable!(),
               }
             }
 
-            Ok(Instr::Phi { dest, srcs })
+            Ok(Instr { kind: InstrKind::Phi { dest, srcs }, line: self.cur_line })
           },
 
           Token::Call => {
             let name = self.name()?;
             let mut params = vec![];
-            while self.peek()? != Token::NewLine {
+            while !matches!(self.peek()?, Token::NewLine) {
               params.push(self.operand()?);
             }
             
-            Ok(Instr::Call { dest: Some(dest), name, src: params })
+            Ok(Instr { kind: InstrKind::Call { dest: Some(dest), name, src: params }, line: self.cur_line })
           },
 
           Token::Temp(val) =>
@@ -166,26 +177,26 @@ impl<'a> Parser<'a> {
       Token::If => {
         let cond = self.operand()?;
         let block = self.block()?;
-        Ok(Instr::If { cond, block })
+        Ok(Instr { kind: InstrKind::If { cond, block }, line: self.cur_line })
       },
 
       Token::Print => {
         let value = self.operand()?;
-        Ok(Instr::Print { value })
+        Ok(Instr { kind: InstrKind::Print { value }, line: self.cur_line })
       },
 
       Token::Dump => {
-        Ok(Instr::Dump)
+        Ok(Instr { kind: InstrKind::Dump, line: self.cur_line })
       },
 
       Token::Call => {
         let name = self.name()?;
         let mut params = vec![];
-        while self.peek()? != Token::NewLine {
+        while !matches!(self.peek()?, Token::NewLine) {
           params.push(self.operand()?);
         }
         
-        Ok(Instr::Call { dest: None, name, src: params })
+        Ok(Instr { kind: InstrKind::Call { dest: None, name, src: params }, line: self.cur_line })
       },
 
       _ => unreachable!(),
@@ -207,13 +218,13 @@ impl<'a> Parser<'a> {
 
     let branch = match self.token()? {
       Token::Ret => {
-        let temp_opt = if self.peek()? == Token::NewLine {
+        let temp_opt = if matches!(self.peek()?, Token::NewLine) {
           None
         } else {
           Some(self.operand()?)
         };
 
-        Branch::Ret(temp_opt)
+        Branch { kind: BranchKind::Ret(temp_opt), line: self.cur_line }
       },
 
       Token::Cmp => {
@@ -231,10 +242,10 @@ impl<'a> Parser<'a> {
 
         let lblock = self.block()?;
         let rblock = self.block()?;
-        Branch::Cond(cond, lblock, rblock)
+        Branch { kind: BranchKind::Cond(cond, lblock, rblock), line: self.cur_line }
       },
 
-      Token::Jmp => Branch::Jump(self.block()?),
+      Token::Jmp => Branch { kind: BranchKind::Jump(self.block()?), line: self.cur_line },
       _ => unreachable!(),
     };
 
@@ -252,18 +263,17 @@ impl<'a> Parser<'a> {
         },
 
         Ok(Token::Block(_)) => {
+          let line_start = self.cur_line;
           let id = self.block()?;
-          // println!("Block {:?}", self.lexer.clone().into_iter().collect::<Vec<_>>());
           // Parse List of Predecessors
           let mut preds = vec![];
-          while self.peek()? != Token::NewLine {
+          while !matches!(self.peek()?, Token::NewLine) {
             preds.push(self.block()?);
           }
 
           self.skip_newlines()?;
-          // println!("After Preds {:?}", self.lexer.clone().into_iter().collect::<Vec<_>>());
           let (lines, branch) = self.block_inner()?;
-          blocks.insert(id, BasicBlock { id, preds, lines, branch });
+          blocks.insert(id, BasicBlock { id, preds, lines, branch, line_start });
         },
 
         _ => return err("Invalid Block Header"),
@@ -272,11 +282,12 @@ impl<'a> Parser<'a> {
   }
   
   fn func(&mut self) -> Result<Func> {
+    let line_start = self.cur_line;
     let name = self.name()?;
 
     // Parse List of Parameters
     let mut params = vec![];
-    while self.peek()? != Token::NewLine {
+    while !matches!(self.peek()?, Token::NewLine) {
       params.push(self.temp()?);
     }
 
@@ -284,16 +295,17 @@ impl<'a> Parser<'a> {
 
     // Parser Blocks (or single block)
     let blocks = if matches!(self.peek()?, Token::Temp(_) | Token::Ret) { 
+      let line_start = self.cur_line;
       let mut map = FxHashMap::default();
       let (lines, branch) = self.block_inner()?;
-      map.insert(BlockID(0), BasicBlock { id: BlockID(0), preds: vec![], lines, branch });
+      map.insert(BlockID(0), BasicBlock { id: BlockID(0), preds: vec![], lines, branch, line_start });
       map
     
     } else {
       self.blocks()?
     };
 
-    Ok(Func { name, params, blocks })
+    Ok(Func { name, params, blocks, line_start })
   }
 
   fn asm(&mut self) -> Result<ASM> {  
@@ -313,7 +325,6 @@ impl<'a> Parser<'a> {
 // Parses the file string into an ASM
 pub fn parse(file_str: String) -> Result<ASM> {
   let lexer = Token::lexer(file_str.as_str()).peekable();
-  // println!("{:?}", lexer.clone().into_iter().collect::<Vec<_>>());
-  let mut parser = Parser { lexer };
+  let mut parser = Parser { lexer, cur_line: 1 };
   parser.asm()
 }

@@ -33,5 +33,9 @@ pub fn run(file_name: &Path) -> Option<ReturnType> {
     }
   };
 
+  // for (_, func) in abs_asm.iter() {
+  //   println!("{}", func);
+  // }
+
   Some(ProgContext::run(abs_asm))
 }
