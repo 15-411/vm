@@ -19,23 +19,27 @@ BNF syntax uses Regex rules in general. Here are some of the common ones:
 ## Syntax
 
 #### Overall File Structure
+
 ```
 file = (fn "\n"*) *
 ```
 
 #### Function
+
 ```
 fn = id temp* "\n" instr* branch
    | id temp* "\n" block*
 ```
 
 #### Basic Block
+
 ```
 block = block_id "\n" instr* branch     # No Predecessors
       | block_id+ "\n" instr* branch    # With Predecessors
 ```
 
 #### Instructions
+
 ```
 instr = temp "=" oper               "\n"
       | temp "=" unop oper          "\n"
@@ -47,9 +51,11 @@ instr = temp "=" oper               "\n"
       | "print" oper                "\n"
       | "dump"                      "\n"
 ```
+
 TODO: Add more details about some of the special operations
 
 #### Branch Condition / Operation
+
 ```
 branch = "ret" oper?                     "\n"
        | "jmp" block_id                  "\n"
@@ -57,17 +63,20 @@ branch = "ret" oper?                     "\n"
 ```
 
 #### Operands
+
 ```
 oper = temp | const
 ```
 
 #### Temporary or Register
+
 ```
 temp = "#" uint
      | "#" register
 ```
 
 #### Register
+
 ```
 register = eax
          | ebx
@@ -87,27 +96,32 @@ register = eax
 ```
 
 #### Name of a Block
+
 ```
 block_id = "@" uint
 ```
 
 #### A Name or id
+
 ```
 id = [a-zA-Z_][a-zA-Z0-9_]*
 ```
 
 #### An Integer Number Value
+
 ```
 const = (-?)(0 | [1-9][0-9]*)    # Decimal
       | 0[xX][0-9a-fA-F]+        # Hex
 ```
 
 #### Natural Number / Unsigned Integer
+
 ```
 uint = 0 | [1-9][0-9]*
 ```
 
 #### Unary Operations
+
 ```
 unop = "-"     # Negation
      | "~"     # Bitwise Not
@@ -115,6 +129,7 @@ unop = "-"     # Negation
 ```
 
 #### Binary Operations
+
 ```
 binop = "+"     # Add
       | "-"     # Subtract
@@ -136,4 +151,3 @@ binop = "+"     # Add
       | "^"     # Bitwise Xor
       | "&"     # Bitwise And
 ```
-
