@@ -3,7 +3,7 @@ use fxhash::FxHashMap;
 use itertools::Itertools;
 
 use crate::asm::ASM;
-use crate::asm::blocks::{Func, BlockID, BasicBlock, BranchKind, Cond};
+use crate::asm::blocks::{Func, BasicBlock, BranchKind, Cond};
 use crate::asm::instr::{Temp, Operand, InstrKind, TempID};
 use crate::asm::reg::Register;
 
@@ -73,7 +73,7 @@ impl ProgContext {
   fn run_func(&self, name: String, args: Vec<i32>) -> ReturnType {
     let Func { params, blocks, .. } = self.prog.get(&name).unwrap();
     let mut prev_block = None;
-    let mut curr_block = BlockID(0);
+    let mut curr_block = blocks.keys().min().unwrap().clone();
     let mut store = TempStore::new();
 
     // Insert Arguments as Params
