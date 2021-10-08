@@ -11,11 +11,17 @@ pub struct Config {
   #[structopt(short="v")]
   pub verbose: bool,
 
-  // /// Enable Strict SSA Mode
-  // #[structopt(long="ssa")]
-  // pub ssa: bool,  // TODO: Include some sort of SSA mode
+  /// Enable Strict SSA Mode
+  #[structopt(long="ssa")]
+  pub ssa: bool,
 
   /// Input Directory of Test Cases
   #[structopt(name = "FILE", parse(from_os_str))]
   pub file_name: PathBuf,
+}
+
+impl Config {
+  pub fn new_defaults(file_name: PathBuf) -> Self {
+    Self { file_name, ssa: false, verbose: false }
+  }
 }

@@ -1,11 +1,14 @@
+use std::ops::Range;
+
 use crate::ops::{UnOp, BinOp};
+use crate::parser::error::{ParseError, ParseErrorKind};
 
 use super::lexer::Token;
-use super::error::{errs, Result};
+use super::error::{ParseResult};
 
 
 /// Convert BinOp Tokens to Associated OpCode
-pub fn binop_code(op_token: Token) -> Result<BinOp> {
+pub fn binop_code(op_token: Token, range: Range<usize>) -> ParseResult<BinOp> {
   use BinOp::*;
   match op_token {
     Token::Add       => Ok(Add),
@@ -27,18 +30,16 @@ pub fn binop_code(op_token: Token) -> Result<BinOp> {
     Token::BitOr     => Ok(BitOr),
     Token::LogAnd    => Ok(LogAnd),
     Token::LogOr     => Ok(LogOr),
-    // TODO: Replace with panic
-    _                => errs(format!("Invalid token as operator {:?}", op_token)),
+    _                => Err(ParseError(ParseErrorKind::InvalidOperand, range)),
   }
 }
 
 /// Convert UnOp Tokens to Associated OpCode
-pub fn unop_code(op_token: Token) -> Result<UnOp> {
+pub fn unop_code(op_token: Token, range: Range<usize>) -> ParseResult<UnOp> {
   match op_token {
     Token::Sub    => Ok(UnOp::Neg),
     Token::LogNot => Ok(UnOp::LogNot),
     Token::BitNot => Ok(UnOp::BitNot),
-    // TODO: Replace with panic
-    _             => errs(format!("Invalid Unary Operand {:?}", op_token)),
+    _             => Err(ParseError(ParseErrorKind::InvalidOperand, range)),
   }
 }

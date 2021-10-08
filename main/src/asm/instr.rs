@@ -122,6 +122,19 @@ pub struct Instr {
   pub kind: InstrKind,
 }
 
+impl Instr {
+  pub fn dest(&self) -> Option<&Temp> {
+    match &self.kind {
+      InstrKind::BinOp { dest, .. }
+        | InstrKind::UnOp { dest, .. }
+        | InstrKind::Mov { dest, .. }
+        | InstrKind::Phi { dest, .. }
+        | InstrKind::Call { dest: Some(dest), .. } => Some(dest),
+      _ => None
+    }
+  }
+}
+
 impl Display for Instr {
   fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
     write!(f, "{}", self.kind)

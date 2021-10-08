@@ -1,7 +1,4 @@
-// mod bench;
-mod util;
-
-
+use std::fmt::Debug;
 use std::path::PathBuf;
 use std::time::Instant;
 use std::ffi::{OsStr, OsString};
@@ -14,7 +11,8 @@ use structopt::StructOpt;
 use rayon::prelude::*;
 use rayon::iter::Either;
 
-use vm::{run as run_vm, ReturnType, args};
+use vm::args::Config;
+use vm::{run_wrapper as run_vm, ReturnType};
 
 
 #[derive(Debug, Clone)]
@@ -149,7 +147,7 @@ fn main() {
             let mut abs_ext = ext.clone();
             abs_ext.push(".abs");
 
-            run_vm(path.with_extension(abs_ext).as_path())
+            run_vm(&Config::new_defaults(path.with_extension(abs_ext)))
             .map_or(false, |ret| ret == ReturnType::Return(val))
 
           } else {
@@ -166,7 +164,7 @@ fn main() {
             let mut abs_ext = ext.clone();
             abs_ext.push(".abs");
 
-            run_vm(path.with_extension(abs_ext).as_path())
+            run_vm(&Config::new_defaults(path.with_extension(abs_ext)))
             .map_or(false, |ret| ret == ReturnType::DivByZero)
 
           } else {
