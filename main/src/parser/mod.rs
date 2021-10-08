@@ -189,6 +189,10 @@ impl<'a> Parser<'a> {
         Ok(Instr { kind: InstrKind::Dump, line: self.cur_line })
       },
 
+      Token::Nop => {
+        Ok(Instr { kind: InstrKind::Nop, line: self.cur_line })
+      },
+
       Token::Call => {
         let name = self.name()?;
         let mut params = vec![];

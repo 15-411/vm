@@ -144,6 +144,8 @@ impl ProgContext {
             println!("[{}] Line {}: Dump of All Temps", line.line, Local::now().time().format("%H:%M:%S"));
             store.dump();
           },
+
+          InstrKind::Nop => {},
         }
       }
 

@@ -24,6 +24,7 @@ pub enum Token {
   #[token("phi")]   Phi,
   #[token("print")] Print,
   #[token("dump")]  Dump,
+  #[token("nop")]   Nop,
 
   // Generally Used Tokens
   #[token("(")]    LParen,

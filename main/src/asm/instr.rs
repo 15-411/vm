@@ -92,7 +92,8 @@ pub enum InstrKind {
     value: Operand
   },
 
-  Dump
+  Dump,
+  Nop
 }
 
 impl Display for InstrKind {
@@ -109,7 +110,8 @@ impl Display for InstrKind {
       Self::Call { dest: None, src, name, .. } =>
         write!(f, "call {} {}", name, src.iter().format(", ")),
       Self::Print { value, .. } => write!(f, "print {}", value),
-      Self::Dump { .. } => write!(f, "dump"),
+      Self::Dump => write!(f, "dump"),
+      Self::Nop => write!(f, "nop"),
     }
   }
 }
