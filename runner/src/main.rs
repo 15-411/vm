@@ -1,18 +1,26 @@
-use std::fmt::Debug;
+mod args;
+
+use std::collections::HashMap;
+use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::path::PathBuf;
 use std::time::Instant;
-use std::ffi::{OsStr, OsString};
 use std::fs::File;
 use std::io::BufReader;
 use std::io::prelude::*;
 use std::process::Command;
+use std::sync::mpsc::{Sender, Receiver};
+use std::sync::mpsc;
+use std::thread;
 
-use structopt::StructOpt;
+use itertools::Itertools;
 use rayon::prelude::*;
 use rayon::iter::Either;
+use indicatif::{ProgressBar, ProgressStyle};
+use structopt::StructOpt;
 
 use vm::args::Config;
 use vm::{run_wrapper as run_vm, ReturnType};
+use crate::args::{Options, Quiet};
 
 
 #[derive(Debug, Clone)]
@@ -22,6 +30,16 @@ pub enum TestCase {
   Return(i32),
   DivByZero,
   // Abort,
+}
+
+impl Display for TestCase {
+  fn fmt(&self, f: &mut Formatter) -> FmtResult {
+    match self {
+      TestCase::Error => write!(f, "error"),
+      TestCase::Return(val) => write!(f, "return {}", val),
+      TestCase::DivByZero => write!(f, "div-by-zero"),
+    }
+  }
 }
 
 fn expected_res(entry: &PathBuf) -> Option<TestCase> {
@@ -53,55 +71,18 @@ fn expected_res(entry: &PathBuf) -> Option<TestCase> {
   }
 }
 
-
-#[derive(Debug, Eq, PartialEq)]
-enum Quiet {
-  LinePerFile,
-  Fails,
-}
-
-impl From<u64> for Quiet {
-  fn from(x: u64) -> Self {
-    match x {
-      0 => Self::LinePerFile,
-      _ => Self::Fails,
-    }
-  }
-}
-
-fn dir_path(path: &OsStr) -> Result<PathBuf, OsString> {
-  let path = PathBuf::from(path);
-  if path.is_dir() { Ok(path) } else { Err(OsString::from("Path is not a Directory")) }
-}
-
-#[derive(Debug, StructOpt)]
-#[structopt(name="Compiler Test Runner", about="Test Runner Script for Compiler", no_version)]
-struct Options {
-  /// Set Level of Quiet
-  #[structopt(short, parse(from_occurrences=Quiet::from))]
-  quiet: Quiet,
-
-  /// Number of Tests to Run in Parallel
-  #[structopt(short="j", long="parallel", default_value="1")]
-  num_parallel: u8,
-
-  /// Benchmark the Tests in AOT and JIT Compilation
-  #[structopt(short="b")]
-  bench: bool,
-
-  /// Input Directory of Test Cases
-  #[structopt(parse(try_from_os_str=dir_path))]
-  inpath: PathBuf,
+enum Passing {
+  Starting(usize, String),
+  Ending(usize)
 }
 
 
 fn main() {
   let start_time = Instant::now();
   let opt: Options = Options::from_args();
-  println!("{:?}", opt);
   rayon::ThreadPoolBuilder::new().num_threads(opt.num_parallel as usize)
-    .stack_size(64 * 1024 * 1024).build_global().unwrap();
-
+    .stack_size(64 * 1024 * 1024)
+    .build_global().unwrap();
 
   // Collect and Sort Test Files
   let test_files = opt.inpath.read_dir().unwrap().collect::<Vec<_>>();
@@ -109,6 +90,7 @@ fn main() {
     .filter_map(|entry| entry.ok().map(|x| x.path()))
     .collect::<Vec<_>>();
   test_files.par_sort_unstable();
+  let test_count = test_files.len() as u64;
 
 
   // Find Expected Return
@@ -121,21 +103,63 @@ fn main() {
     });
 
 
+  // Set Up Progress Bar
+  let pb = ProgressBar::new(test_files.len() as u64);
+  pb.set_style(ProgressStyle::default_bar()
+    .template("({elapsed_precise}) {pos}/{len} [{bar:60.blue}] {wide_msg}")
+    .progress_chars("##-"));
+
+  // Set Up Thread to Collect and Modify Progress Bar
+  let (tx, rx): (Sender<Passing>, Receiver<Passing>) = mpsc::channel();
+  let child = thread::spawn(move || {
+    let mut running_tests = HashMap::new();
+
+    while pb.position() < test_count {
+      match rx.recv() {
+        Ok(Passing::Starting(test_idx, test_case)) => {
+          if running_tests.len() < 4 {
+            running_tests.insert(test_idx, test_case);
+          }
+          
+          pb.inc(1);
+          pb.set_message(running_tests.values().format(", ").to_string());
+        },
+
+        Ok(Passing::Ending(test_idx)) => {
+          running_tests.remove(&test_idx);
+        },
+
+        Err(_) => break,
+      }
+    }
+
+    pb.finish_with_message("Done!");
+  });
+
+
   // Run Each Test Case
   let test_count = test_files.len();
   let (timeout_tests, failed_tests): (Vec<_>, Vec<_>) = test_files.into_par_iter()
-    .filter_map(|(path, expec)| {
-      // let (just_tc, header) = util::expected_header(&path);
-      // let maybe_ast = compiler::run_front(&cfg);
+    .enumerate()
+    .map_with(tx, |tx, (idx, (path, expec))| {
+      let path_str = path.as_path().file_name().unwrap().to_str().unwrap().to_string();
+      let _ = tx.send(Passing::Starting(idx, path_str));
+
+      // std::thread::sleep(std::time::Duration::from_secs(1));
+      // Print Basic Info
+      // println!("Running `{}` expecting {}", path.display(), expec);
+
       let ext = path.extension().unwrap().to_os_string();
-      let mut compiler = Command::new("tests/lab1");
+      let mut compiler = Command::new(opt.bin_path.as_os_str().to_str().unwrap());
       compiler.arg(path.clone());
 
       let succ = match expec {
         TestCase::Error => {
-          !compiler.arg("-t").output()
-            .expect("Failed to run compiler")
-            .status.success()
+          let output = compiler.arg("-t").output()
+            .expect("Failed to run compiler");
+
+          // println!("{} {}", String::from_utf8(output.stdout).unwrap(), String::from_utf8(output.stderr).unwrap());
+          !output.status.success()
         },
 
         TestCase::Return(val) => {
@@ -143,33 +167,45 @@ fn main() {
             .expect("Failed to run compiler")
             .status.success();
 
-          if success {
+          let res = if success {
             let mut abs_ext = ext.clone();
             abs_ext.push(".abs");
+            let new_path = path.with_extension(abs_ext);
 
-            run_vm(&Config::new_defaults(path.with_extension(abs_ext)))
-            .map_or(false, |ret| ret == ReturnType::Return(val))
+            let res = run_vm(&Config::new_defaults(new_path.clone())) 
+              .map_or(false, |ret| ret == ReturnType::Return(val));
+
+            let _ = std::fs::remove_file(new_path);
+            res
 
           } else {
             false
-          }
+          };
+
+          res
         },
-        
+
         TestCase::DivByZero => {
           let success = compiler.arg("-eabs").output()
             .expect("Failed to run compiler")
             .status.success();
 
-          if success {
+          let res = if success {
             let mut abs_ext = ext.clone();
             abs_ext.push(".abs");
+            let new_path = path.with_extension(abs_ext);
 
-            run_vm(&Config::new_defaults(path.with_extension(abs_ext)))
-            .map_or(false, |ret| ret == ReturnType::DivByZero)
+            let res = run_vm(&Config::new_defaults(new_path.clone()))
+              .map_or(false, |ret| ret == ReturnType::DivByZero);
+
+            let _ = std::fs::remove_file(new_path);
+            res
 
           } else {
             false
-          }
+          };
+
+          res
         },
         // (true, _, Ok(_)) => Some(true),
         // (_, TestCase::Return(val), Ok(ast)) => correct_res(&cfg, ast, ReturnType::Return(val)),
@@ -179,11 +215,14 @@ fn main() {
         // _ => None
       };
 
-      match succ {
+      let _ = tx.send(Passing::Ending(idx));
+
+      let res = match succ {
         // Some(true) => {
         true => {
           if opt.quiet != Quiet::Fails {
-            println!("\x1b[92m-- PASS: {:?} --\x1b[0m", path);
+            // pb.println("test");
+            // println!("\x1b[92m-- PASS: {:?} --\x1b[0m", path);
           }
           None
         },
@@ -193,11 +232,15 @@ fn main() {
         // },
         //None => {
         false => {
-          println!("\x1b[1m\x1b[91m-- FAIL: {:?} --\x1b[0m", path, );
+          // println!("\x1b[1m\x1b[91m-- FAIL: {:?} --\x1b[0m", path, );
           Some((path, false))
         },
-      }
+      };
+
+      // println!();
+      res
     })
+    .filter_map(|x| x)
     .partition_map(|(path, is_timeout)| {
       if is_timeout {
         Either::Left(path)
@@ -206,7 +249,11 @@ fn main() {
       }
     });
 
-  let failed_count = failed_tests.len() + timeout_tests.len();
+  let failed_count = failed_tests.len();
+  let timeout_count = timeout_tests.len();
+
+  // Join Handler
+  let _ = child.join();
 
   // Print Summary
   println!("\x1b[1m-- Summary --\x1b[0m");
@@ -232,9 +279,9 @@ fn main() {
   }
 
   println!("-- Elapsed Time: {:.3}s --", start_time.elapsed().as_secs_f32());
-  println!("-- Passed: {} / {} --", test_count - failed_count, test_count);
+  println!("-- Passed:  {} / {} --", test_count - failed_count - timeout_count, test_count);
+  println!("-- Failed:  {} / {} --", failed_count, test_count);
+  println!("-- Timeout: {} / {} --", timeout_count, test_count);
 
-  // if opt.bench {
-  //   bench::bench(test_files);
-  // }
+  // TODO: Add Autograder Calculation
 }

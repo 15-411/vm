@@ -16,3 +16,8 @@ Cargo.lock
 
 tests/
 .vscode/
+.DS_Store
+
+c0abs-vscode/
+c0c
+flamegraph.svg

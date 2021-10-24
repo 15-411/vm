@@ -1,3 +1,6 @@
 [workspace]
 members = ["derives", "main", "runner"]
 default-members = ["main"]
+
+[profile.release]
+debug = true

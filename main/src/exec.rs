@@ -10,6 +10,7 @@ use crate::asm::reg::Register;
 
 struct TempStore {
   pub temps: FxHashMap<Temp, i32>,
+  pub base: [i32; 15],
 }
 
 impl TempStore {
@@ -19,7 +20,7 @@ impl TempStore {
       temps.insert(Temp(TempID::Reg(reg)), 0);
     }
 
-    TempStore { temps }    
+    TempStore { temps, base: [0; 15] }    
   }
 
   // fn get_op64(&self, op: &Operand) -> u64 {
@@ -32,7 +33,9 @@ impl TempStore {
   fn get(&self, op: &Operand) -> i32 {
     match op {
       Operand::Const(val) => *val,
-      Operand::Temp(temp) => *self.temps.get(temp).unwrap(),
+      Operand::Temp(temp @ Temp(TempID::Reg(_))) => *self.temps.get(temp).unwrap(),
+      Operand::Temp(Temp(TempID::Num(elem))) => self.base[*elem as usize],
+      //Operand::Temp(temp) => *self.temps.get(temp).unwrap(),
     }
   }
 
@@ -42,8 +45,13 @@ impl TempStore {
         *self.temps.get_mut(dest).unwrap() = src;
       },
 
-      TempID::Num(_) => {
-        self.temps.insert(dest.clone(), src);
+      TempID::Num(elem) => {
+        self.base[*elem as usize] = src;
+        // if let Some(res) = self.temps.get_mut(dest) {
+        //   *res = src;
+        // } else {
+        //   self.temps.insert(dest.clone(), src);
+        // }
       },
     }
   }
