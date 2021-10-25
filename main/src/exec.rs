@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use chrono::Local;
 use fxhash::FxHashMap;
 use itertools::Itertools;
@@ -10,17 +12,17 @@ use crate::asm::reg::Register;
 
 struct TempStore {
   pub temps: FxHashMap<Temp, i32>,
-  pub base: [i32; 15],
+  pub base: Vec<i32>,
 }
 
 impl TempStore {
-  fn new() -> Self {
+  fn new(count: u64) -> Self {
     let mut temps = FxHashMap::default();
     for reg in Register::ALL {
       temps.insert(Temp(TempID::Reg(reg)), 0);
     }
 
-    TempStore { temps, base: [0; 15] }    
+    TempStore { temps, base: vec![0; count as usize] }    
   }
 
   // fn get_op64(&self, op: &Operand) -> u64 {
@@ -47,11 +49,6 @@ impl TempStore {
 
       TempID::Num(elem) => {
         self.base[*elem as usize] = src;
-        // if let Some(res) = self.temps.get_mut(dest) {
-        //   *res = src;
-        // } else {
-        //   self.temps.insert(dest.clone(), src);
-        // }
       },
     }
   }
@@ -70,19 +67,21 @@ pub enum ReturnType {
   DivByZero,
   // Abort,
   // MemError,
-  // Timeout,
+  Timeout,
 }
 
 pub struct ProgContext {
   prog: ASM,
+  start: Instant,
+  timeout: u64,
 }
 
 impl ProgContext {
   fn run_func(&self, name: String, args: Vec<i32>) -> ReturnType {
-    let Func { params, blocks, .. } = self.prog.get(&name).unwrap();
+    let Func { params, blocks, count, .. } = self.prog.get(&name).unwrap();
     let mut prev_block = None;
     let mut curr_block = blocks.keys().min().unwrap().clone();
-    let mut store = TempStore::new();
+    let mut store = TempStore::new(count.unwrap());
 
     // Insert Arguments as Params
     for (param, arg) in params.iter().zip_eq(args.into_iter()) {
@@ -91,6 +90,10 @@ impl ProgContext {
 
     // Run Function Blocks
     'outer: loop {
+      if self.start.elapsed().as_secs() > self.timeout {
+        return ReturnType::Timeout;
+      }
+
       let BasicBlock { preds, lines, branch, .. } 
         = blocks.get(&curr_block).unwrap();
 
@@ -184,8 +187,8 @@ impl ProgContext {
     }
   }
 
-  pub fn run(prog: ASM) -> ReturnType {
-    let ctx = ProgContext { prog };
+  pub fn run(prog: ASM, timeout: u64) -> ReturnType {
+    let ctx = ProgContext { prog, start: Instant::now(), timeout };
     ctx.run_func("main".to_string(), vec![])
   }  
 }

@@ -25,7 +25,7 @@ use crate::args::{Options, Quiet};
 
 #[derive(Debug, Clone)]
 pub enum TestCase {
-  // Typecheck,
+  Typecheck,
   Error,
   Return(i32),
   DivByZero,
@@ -38,6 +38,7 @@ impl Display for TestCase {
       TestCase::Error => write!(f, "error"),
       TestCase::Return(val) => write!(f, "return {}", val),
       TestCase::DivByZero => write!(f, "div-by-zero"),
+      TestCase::Typecheck => write!(f, "typecheck"),
     }
   }
 }
@@ -55,10 +56,11 @@ fn expected_res(entry: &PathBuf) -> Option<TestCase> {
     Some(TestCase::Error)
   } else if first_line == "//test div-by-zero" {
     Some(TestCase::DivByZero)
+  } else if first_line == "//test typecheck" {
+    Some(TestCase::Typecheck)
   // } else if first_line == "//test abort" {
   //   Some(TestCase::Abort)
-  // } else if first_line == "//test typecheck" {
-  //   Some(TestCase::Typecheck)
+
 
   } else if first_line.starts_with("//test return ") {
     if first_line.chars().nth(14)? == '~' {
@@ -74,6 +76,33 @@ fn expected_res(entry: &PathBuf) -> Option<TestCase> {
 enum Passing {
   Starting(usize, String),
   Ending(usize)
+}
+
+fn exec(mut compiler: Command, path: &PathBuf, expected_ret: ReturnType) -> Option<bool> {
+  let ext = path.extension().unwrap().to_os_string();
+
+  let exec_success = compiler.arg("-eabs").output()
+    .expect("Failed to run compiler")
+    .status.success();
+
+  if exec_success {
+    let mut abs_ext = ext.clone();
+    abs_ext.push(".abs");
+    let new_path = path.with_extension(abs_ext);
+
+    let res = match run_vm(&Config::new_timeout(new_path.clone(), 6)) {
+      Err(_) => Some(true),
+      Ok(ReturnType::Timeout) => Some(false),
+      Ok(ret) if ret == expected_ret => None,
+      _ => Some(true),
+    };
+
+    let _ = std::fs::remove_file(new_path);
+    res
+
+  } else {
+    Some(true)
+  }
 }
 
 
@@ -149,7 +178,6 @@ fn main() {
       // Print Basic Info
       // println!("Running `{}` expecting {}", path.display(), expec);
 
-      let ext = path.extension().unwrap().to_os_string();
       let mut compiler = Command::new(opt.bin_path.as_os_str().to_str().unwrap());
       compiler.arg(path.clone());
 
@@ -159,93 +187,47 @@ fn main() {
             .expect("Failed to run compiler");
 
           // println!("{} {}", String::from_utf8(output.stdout).unwrap(), String::from_utf8(output.stderr).unwrap());
-          !output.status.success()
+          if !output.status.success() { None } else { Some(true) }
         },
 
-        TestCase::Return(val) => {
-          let success = compiler.arg("-eabs").output()
-            .expect("Failed to run compiler")
-            .status.success();
+        TestCase::Return(val) => exec(compiler, &path, ReturnType::Return(val)),
+        TestCase::DivByZero => exec(compiler, &path, ReturnType::DivByZero),
 
-          let res = if success {
-            let mut abs_ext = ext.clone();
-            abs_ext.push(".abs");
-            let new_path = path.with_extension(abs_ext);
-
-            let res = run_vm(&Config::new_defaults(new_path.clone())) 
-              .map_or(false, |ret| ret == ReturnType::Return(val));
-
-            let _ = std::fs::remove_file(new_path);
-            res
-
-          } else {
-            false
-          };
-
-          res
-        },
-
-        TestCase::DivByZero => {
-          let success = compiler.arg("-eabs").output()
-            .expect("Failed to run compiler")
-            .status.success();
-
-          let res = if success {
-            let mut abs_ext = ext.clone();
-            abs_ext.push(".abs");
-            let new_path = path.with_extension(abs_ext);
-
-            let res = run_vm(&Config::new_defaults(new_path.clone()))
-              .map_or(false, |ret| ret == ReturnType::DivByZero);
-
-            let _ = std::fs::remove_file(new_path);
-            res
-
-          } else {
-            false
-          };
-
-          res
-        },
-        // (true, _, Ok(_)) => Some(true),
-        // (_, TestCase::Return(val), Ok(ast)) => correct_res(&cfg, ast, ReturnType::Return(val)),
-        // (_, TestCase::DivByZero, Ok(ast)) => correct_res(&cfg, ast, ReturnType::DivByZero),
-        // (_, TestCase::Abort, Ok(ast)) => correct_res(&cfg, ast, ReturnType::Abort),
-        // (_, TestCase::Error, Err(_)) | (_, TestCase::Typecheck, Ok(_)) => Some(true),
-        // _ => None
+        TestCase::Typecheck => None,
       };
 
       let _ = tx.send(Passing::Ending(idx));
 
-      let res = match succ {
-        // Some(true) => {
-        true => {
-          if opt.quiet != Quiet::Fails {
-            // pb.println("test");
-            // println!("\x1b[92m-- PASS: {:?} --\x1b[0m", path);
-          }
-          None
-        },
-        // Some(false) => {
-        //   println!("\x1b[1m\x1b[93m-- TIME: {:?} --\x1b[0m", path);
-        //   Some((path, true))
-        // },
-        //None => {
-        false => {
-          // println!("\x1b[1m\x1b[91m-- FAIL: {:?} --\x1b[0m", path, );
-          Some((path, false))
-        },
-      };
+      // let res = match succ {
+      //   // Some(true) => {
+      //   true => {
+      //     // if opt.quiet != Quiet::Fails {
+      //       // pb.println("test");
+      //       // println!("\x1b[92m-- PASS: {:?} --\x1b[0m", path);
+      //     // }
+      //     None
+      //   },
+      //   // Some(false) => {
+      //   //   println!("\x1b[1m\x1b[93m-- TIME: {:?} --\x1b[0m", path);
+      //   //   Some((path, true))
+      //   // },
+      //   //None => {
+      //   false => {
+      //     // println!("\x1b[1m\x1b[91m-- FAIL: {:?} --\x1b[0m", path, );
+      //     Some((path, false))
+      //   },
+      // };
 
-      // println!();
-      res
+
+      succ.map(|val| (path, val))
     })
+
     .filter_map(|x| x)
-    .partition_map(|(path, is_timeout)| {
-      if is_timeout {
-        Either::Left(path)
-      } else {
+    .partition_map(|(path, is_fail)| {
+      if is_fail {
         Either::Right(path)
+      } else {
+        Either::Left(path)
       }
     });
 
@@ -278,7 +260,7 @@ fn main() {
     }
   }
 
-  println!("-- Elapsed Time: {:.3}s --", start_time.elapsed().as_secs_f32());
+  println!("-- Elapsed Time: {:.2}s --", start_time.elapsed().as_secs_f32());
   println!("-- Passed:  {} / {} --", test_count - failed_count - timeout_count, test_count);
   println!("-- Failed:  {} / {} --", failed_count, test_count);
   println!("-- Timeout: {} / {} --", timeout_count, test_count);

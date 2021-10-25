@@ -2,12 +2,13 @@
 name = "runner"
 version = "0.1.0"
 authors = ["Srinivas Lade <srinulade1@gmail.com>"]
-edition = "2018"
+edition = "2021"
+publish = false
 
 [dependencies]
 structopt = "0.3.21"
 rayon = "1.5.0"
 itertools = "0.9.0"
-indicatif = {version = "0.17.0-beta.1", features = ["rayon"]}
+indicatif = "0.17.0-beta.1"
 
 vm = { path = "../main" }

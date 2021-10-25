@@ -40,6 +40,7 @@ fn main() {
   match vm::run(&config, file_str.as_str()) {
     Ok(ReturnType::Return(val)) => println!("return {}", val),
     Ok(ReturnType::DivByZero) => println!("div-by-zero"),
+    Ok(ReturnType::Timeout) => println!("timeout"),
 
     Err(err) => {
       let mut diagnostic = Diagnostic::error()

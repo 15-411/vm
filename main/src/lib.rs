@@ -21,6 +21,7 @@ mod exec;
 mod ops;
 mod parser;
 mod analysis;
+mod rename;
 
 use std::fs::File;
 use std::io::{BufReader, Read};
@@ -31,6 +32,7 @@ use args::Config;
 use exec::ProgContext;
 pub use exec::ReturnType;
 pub use error::{Error, ErrorTrait};
+use rename::rename;
 
 
 pub fn run(config: &Config, file_str: &str) -> Result<ReturnType, Error> {
@@ -43,8 +45,11 @@ pub fn run(config: &Config, file_str: &str) -> Result<ReturnType, Error> {
   //   println!("{}", func);
   // }
 
+  // Renaming Stage
+  let abs = rename(abs);
+
   // TODO: Any errors here?
-  Ok(ProgContext::run(abs))
+  Ok(ProgContext::run(abs, config.timeout.unwrap_or(1000)))
 }
 
 pub fn run_wrapper(config: &Config) -> Result<ReturnType, Error> {

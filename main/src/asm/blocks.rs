@@ -93,6 +93,7 @@ pub struct Func {
   pub params: Vec<Temp>,
   pub blocks: FxHashMap<BlockID, BasicBlock>,
   pub line_start: u64,
+  pub count: Option<u64>,
 }
 
 impl Display for Func {

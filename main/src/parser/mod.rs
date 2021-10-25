@@ -344,7 +344,7 @@ impl<'a> Parser<'a> {
       self.blocks()?
     };
 
-    Ok(Func { name, params, blocks, line_start })
+    Ok(Func { name, params, blocks, line_start, count: None })
   }
 
   fn asm(&mut self) -> ParseResult<ASM> {  
