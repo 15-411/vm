@@ -6,7 +6,7 @@ use fxhash::FxHashMap;
 use logos::{Logos, Lexer};
 
 use crate::asm::ASM;
-use crate::asm::blocks::{Func, BasicBlock, BlockID, Branch, BranchKind, Cond};
+use crate::asm::blocks::{Func, BasicBlock, BlockID, Branch, BranchKind, Cond, CondJumpKind};
 use crate::asm::instr::{InstrKind, Instr, Operand, Temp};
 
 use lexer::Token;
@@ -242,7 +242,10 @@ impl<'a> Parser<'a> {
 
     loop {
       match self.peek()? {
-        Token::Ret | Token::Jmp | Token::Cmp => break,
+        Token::Ret | Token::Jmp | Token::Cmp | 
+        Token::Jz | Token::Jnz | Token::Je | Token::Jne |
+        Token::Jl | Token::Jle | Token::Jg | Token::Jge | 
+        Token::Jnl | Token::Jnle | Token::Jng | Token::Jnge => break,
         _ => {
           lines.push(self.instr()?);
           self.skip_opt_newlines();
@@ -258,7 +261,7 @@ impl<'a> Parser<'a> {
           Some(self.operand()?)
         };
 
-        Branch { kind: BranchKind::Ret(temp_opt), line: self.cur_line }
+        BranchKind::Ret(temp_opt)
       },
 
       Token::Cmp => {
@@ -276,15 +279,28 @@ impl<'a> Parser<'a> {
 
         let lblock = self.block()?;
         let rblock = self.block()?;
-        Branch { kind: BranchKind::Cond(cond, lblock, rblock), line: self.cur_line }
+        BranchKind::Cond(cond, lblock, rblock)
       },
 
-      Token::Jmp => Branch { kind: BranchKind::Jump(self.block()?), line: self.cur_line },
+      Token::Jmp => BranchKind::Jump(self.block()?),
+      Token::Jz => BranchKind::CondJump(CondJumpKind::Zero, self.block()?, self.block()?),
+      Token::Jnz => BranchKind::CondJump(CondJumpKind::NotZero, self.block()?, self.block()?),
+      Token::Je => BranchKind::CondJump(CondJumpKind::Equal, self.block()?, self.block()?),
+      Token::Jne => BranchKind::CondJump(CondJumpKind::NotEqual, self.block()?, self.block()?),
+      Token::Jl => BranchKind::CondJump(CondJumpKind::Less, self.block()?, self.block()?),
+      Token::Jle => BranchKind::CondJump(CondJumpKind::LessEqual, self.block()?, self.block()?),
+      Token::Jg => BranchKind::CondJump(CondJumpKind::Greater, self.block()?, self.block()?),
+      Token::Jge => BranchKind::CondJump(CondJumpKind::GreaterEqual, self.block()?, self.block()?),
+      Token::Jnl => BranchKind::CondJump(CondJumpKind::NotLess, self.block()?, self.block()?),
+      Token::Jnle => BranchKind::CondJump(CondJumpKind::NotLessEqual, self.block()?, self.block()?),
+      Token::Jng => BranchKind::CondJump(CondJumpKind::NotGreater, self.block()?, self.block()?),
+      Token::Jnge => BranchKind::CondJump(CondJumpKind::NotGreaterEqual, self.block()?, self.block()?),
+
       _ => unreachable!(),
     };
 
     self.skip_newlines()?;
-    Ok((lines, branch))
+    Ok((lines, Branch { kind: branch, line: self.cur_line }))
   }
 
   fn blocks(&mut self) -> ParseResult<FxHashMap<BlockID, BasicBlock>> {

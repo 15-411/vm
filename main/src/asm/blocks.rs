@@ -35,9 +35,46 @@ impl Display for BlockID {
 
 
 #[derive(Debug, Clone)]
+pub enum CondJumpKind {
+  Zero,
+  NotZero,
+  Equal,
+  NotEqual,
+  Less,
+  LessEqual,
+  Greater,
+  GreaterEqual,
+  NotLess,
+  NotLessEqual,
+  NotGreater,
+  NotGreaterEqual,
+}
+
+impl Display for CondJumpKind {
+  fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
+    match self {
+      CondJumpKind::Zero => write!(f, "z"),
+      CondJumpKind::NotZero => write!(f, "nz"),
+      CondJumpKind::Equal => write!(f, "e"),
+      CondJumpKind::NotEqual => write!(f, "ne"),
+      CondJumpKind::Less => write!(f, "l"),
+      CondJumpKind::LessEqual => write!(f, "le"),
+      CondJumpKind::Greater => write!(f, "g"),
+      CondJumpKind::GreaterEqual => write!(f, "ge"),
+      CondJumpKind::NotLess => write!(f, "nl"),
+      CondJumpKind::NotLessEqual => write!(f, "nle"),
+      CondJumpKind::NotGreater => write!(f, "ng"),
+      CondJumpKind::NotGreaterEqual => write!(f, "nge"),
+    }
+  }
+}
+
+
+#[derive(Debug, Clone)]
 pub enum BranchKind {
   Cond(Cond, BlockID, BlockID),
   Jump(BlockID),
+  CondJump(CondJumpKind, BlockID, BlockID),
   Ret(Option<Operand>),
 }
 
@@ -46,6 +83,10 @@ impl Display for BranchKind {
     match self {
       Self::Cond(cond, true_block, false_block) =>
         write!(f, "cmp {} {} {}", cond, true_block, false_block),
+      
+        Self::CondJump(cond, true_block, false_block) =>
+        write!(f, "j{} {} {}", cond, true_block, false_block),
+
       Self::Jump(block) => write!(f, "jmp {}", block),
       Self::Ret(None) => write!(f, "ret"),
       Self::Ret(Some(val)) => write!(f, "ret {}", val),

@@ -5,7 +5,7 @@ use fxhash::FxHashMap;
 use itertools::Itertools;
 
 use crate::asm::ASM;
-use crate::asm::blocks::{Func, BasicBlock, BranchKind, Cond};
+use crate::asm::blocks::{Func, BasicBlock, BranchKind, Cond, CondJumpKind};
 use crate::asm::instr::{Temp, Operand, InstrKind, TempID};
 use crate::asm::reg::Register;
 
@@ -74,6 +74,9 @@ pub struct ProgContext {
   prog: ASM,
   start: Instant,
   timeout: u64,
+  zero_flag: bool,
+  sign_flag: bool,
+  overflow_flag: bool,
 }
 
 impl ProgContext {
@@ -183,12 +186,31 @@ impl ProgContext {
           prev_block = Some(curr_block);
           curr_block = *block;
         },
+
+        BranchKind::CondJump(cond, tidx, fidx) => {
+          let val = match cond {
+            CondJumpKind::Zero | CondJumpKind::Equal => self.zero_flag,
+            CondJumpKind::NotZero | CondJumpKind::NotEqual => !self.zero_flag,
+            CondJumpKind::Less | CondJumpKind::NotGreaterEqual => self.sign_flag != self.overflow_flag,
+            CondJumpKind::LessEqual | CondJumpKind::NotGreater => (self.sign_flag != self.overflow_flag) || self.zero_flag,
+            CondJumpKind::Greater | CondJumpKind::NotLessEqual => (self.sign_flag == self.overflow_flag) && !self.zero_flag,
+            CondJumpKind::GreaterEqual | CondJumpKind::NotLess => self.sign_flag == self.overflow_flag,
+          };
+
+          let block = if val { tidx } else { fidx };
+          prev_block = Some(curr_block);
+          curr_block = *block;
+        },
       }
     }
   }
 
   pub fn run(prog: ASM, timeout: u64) -> ReturnType {
-    let ctx = ProgContext { prog, start: Instant::now(), timeout };
+    let ctx = ProgContext {
+      prog, start: Instant::now(), timeout,
+      zero_flag: false, overflow_flag: false, sign_flag: false,
+    };
+
     ctx.run_func("main".to_string(), vec![])
   }  
 }

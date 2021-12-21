@@ -19,12 +19,27 @@ pub enum Token {
   #[token("ret")]   Ret,
   #[token("jmp")]   Jmp,
   #[token("cmp")]   Cmp,
+  #[token("cmp86")] Cmp86,
   #[token("if")]    If,
   #[token("call")]  Call,
   #[token("phi")]   Phi,
   #[token("print")] Print,
   #[token("dump")]  Dump,
   #[token("nop")]   Nop,
+
+  // Jump Keywords
+  #[token("jz")]    Jz,
+  #[token("jnz")]   Jnz,
+  #[token("jne")]   Jne,
+  #[token("je")]    Je,
+  #[token("jl")]    Jl,
+  #[token("jle")]   Jle,
+  #[token("jg")]    Jg,
+  #[token("jge")]   Jge,
+  #[token("jnl")]   Jnl,
+  #[token("jnle")]  Jnle,
+  #[token("jng")]   Jng,
+  #[token("jnge")]  Jnge,
 
   // Generally Used Tokens
   #[token("(")]    LParen,

@@ -101,7 +101,6 @@ impl Context {
           branch: {
             let Branch { line, kind } = branch;
             Branch { line, kind: match kind {
-              BranchKind::Jump(bidx) => BranchKind::Jump(bidx),
               BranchKind::Ret(src) => BranchKind::Ret(src.map(|src| self.get_map_op(src))),
               BranchKind::Cond(cond, bidx1, bidx2) => BranchKind::Cond(
                 match cond {
@@ -113,6 +112,7 @@ impl Context {
                 bidx1,
                 bidx2
               ),
+              other => other
             }}
           },
         })
